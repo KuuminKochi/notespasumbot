@@ -7,8 +7,8 @@ import os
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
-NOTES_PASUM = os.getenv("NOTES_PASUM")
-ADMIN_NOTES = os.getenv("ADMIN_NOTES")
+NOTES_PASUM = int(os.getenv("NOTES_PASUM"))
+ADMIN_NOTES = int(os.getenv("ADMIN_NOTES"))
 
 async def pipe_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -27,25 +27,25 @@ async def pipe_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # --- Send to both NOTES_PASUM and asker ---
     targets = [int(NOTES_PASUM), int(asker_id)]
-    for target in targets:
-        if target == int(NOTES_PASUM):
-            # Group: send Q first (once), then answer
-            if q_media:
-                mtype, fid = q_media
-                if mtype == "photo":
-                    await context.bot.send_photo(target, fid, caption=f"Q from @{asker}:\n{q_text}")
-                elif mtype == "document":
-                    await context.bot.send_document(target, fid, caption=f"Q from @{asker}:\n{q_text}")
-                elif mtype == "video":
-                    await context.bot.send_video(target, fid, caption=f"Q from @{asker}:\n{q_text}")
-                elif mtype == "audio":
-                    await context.bot.send_audio(target, fid, caption=f"Q from @{asker}:\n{q_text}")
-                elif mtype == "voice":
-                    await context.bot.send_voice(target, fid, caption=f"Q from @{asker}:\n{q_text}")
-            else:
-                await context.bot.send_message(target, text=f"Q from @{asker}:\n{q_text}")
 
-        # Both group and asker get the answer
+    for target in targets:
+        # 1. Send Q first
+        if q_media:
+            mtype, fid = q_media
+            if mtype == "photo":
+                await context.bot.send_photo(target, fid, caption=f"Q:\n{q_text}")
+            elif mtype == "document":
+                await context.bot.send_document(target, fid, caption=f"Q:\n{q_text}")
+            elif mtype == "video":
+                await context.bot.send_video(target, fid, caption=f"Q:\n{q_text}")
+            elif mtype == "audio":
+                await context.bot.send_audio(target, fid, caption=f"Q:\n{q_text}")
+            elif mtype == "voice":
+                await context.bot.send_voice(target, fid, caption=f"Q:\n{q_text}")
+        else:
+            await context.bot.send_message(target, text=f"Q:\n{q_text}")
+
+        # 2. Send A after
         if update.message.photo:
             fid = update.message.photo[-1].file_id
             await context.bot.send_photo(target, fid, caption=f"Answer from @{answerer}:\n{a_text}")
@@ -63,4 +63,3 @@ async def pipe_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_voice(target, fid, caption=f"Answer from @{answerer}:\n{a_text}")
         else:
             await context.bot.send_message(target, text=f"Answer from @{answerer}:\n{a_text}")
-
