@@ -25,16 +25,15 @@ async def track_active(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # (optional) Debug log
         print(f"Tracked active: {display_name} ({user.id})")
 
-
 async def pasum_match(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """DMs user random PASUM matches from active pool."""
+    """Sends PASUM matches both in group and DM."""
     user = update.effective_user
 
     if not globals.active_users:
         await update.message.reply_text("No active users yet to match with 🥲")
         return
 
-    # remove self from pool
+    # Remove self from pool
     pool = [u for u in globals.active_users if u[0] != user.id]
     if not pool:
         await update.message.reply_text("You’re the only active one 💀")
@@ -42,7 +41,7 @@ async def pasum_match(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Generate random matches
     matches = random.sample(pool, min(5, len(pool)))  # up to 5
-    text = "💘 Your PASUM Matches 💘\n\n"
+    text = f"💘 PASUM Matches for {user.mention_html()} 💘\n\n"
     for uid, uname in matches:
         score = random.randint(0, 100)
         if score == 100:
@@ -57,9 +56,16 @@ async def pasum_match(update: Update, context: ContextTypes.DEFAULT_TYPE):
             comment = "💀 Please stick to group study only."
         text += f"{uname} = {score}%\n{comment}\n\n"
 
-    # Always send result in DM
-    await context.bot.send_message(chat_id=user.id, text=text)
+    # Always send to group
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
+        parse_mode="HTML"
+    )
 
-    # If triggered in group, tell them to check DM
-    if update.effective_chat.id == globals.NOTES_PASUM:
-        await update.message.reply_text("Check your DMs for your PASUM Matches 😉")
+    # Also try to DM the user
+    try:
+        await context.bot.send_message(chat_id=user.id, text=text, parse_mode="HTML")
+    except Exception:
+        pass  # ignore if they haven't started bot
+
