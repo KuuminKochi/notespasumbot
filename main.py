@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from dotenv import load_dotenv
-from utils import pipequestions, pipeanswers, globals
+from utils import pipequestions, pipeanswers, globals, start, getid, pasummatch
 import os
 
 load_dotenv()
@@ -11,16 +11,6 @@ NOTES_PASUM = int(os.getenv("NOTES_PASUM"))
 ADMIN_NOTES = int(os.getenv("ADMIN_NOTES"))
 
 app = Application.builder().token(API_KEY).build()
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(globals.INTRODUCTION)
-
-
-async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    await update.message.reply_text(f"Chat ID: {chat_id}")
-
 
 app.add_handler(MessageHandler(
     filters.ChatType.PRIVATE & ~filters.COMMAND,
@@ -32,11 +22,22 @@ app.add_handler(MessageHandler(
 ))
 app.add_handler(CommandHandler(
     "getId",
-    get_id
+    getid.get_id
 ))
+
 app.add_handler(CommandHandler(
     "start",
-    start
+    start.start
+))
+
+app.add_handler(MessageHandler(
+    filters.Chat(NOTES_PASUM) & ~filters.COMMAND,
+    pasummatch.track_active
+))
+
+# Run pasum_match
+app.add_handler(CommandHandler(
+    "pasummatch", pasummatch.pasum_match
 ))
 
 app.run_polling()

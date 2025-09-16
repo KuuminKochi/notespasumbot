@@ -1,4 +1,5 @@
 question_map = {}  # {admin_msg_id: (q_text, asker, asker_id, media)}
+active_users = set()  # { (user_id, username/full_name) }
 
 INTRODUCTION = """
 Hello, my name is Mimi. I'm your dedicated Notes PASUM 25/26 Bot!
