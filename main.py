@@ -36,7 +36,7 @@ app.add_handler(CommandHandler(
 ))
 
 app.add_handler(MessageHandler(
-    filters.Chat(NOTES_PASUM) & ~filters.COMMAND,
+    filters.ALL & filters.Chat(NOTES_PASUM),
     pasummatch.track_active
 ))
 

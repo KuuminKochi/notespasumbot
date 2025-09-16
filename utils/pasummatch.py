@@ -13,15 +13,18 @@ ADMIN_NOTES = int(os.getenv("ADMIN_NOTES"))
 
 # Track active users (people who messaged in NOTES_PASUM group)
 async def track_active(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Tracks users who messaged in NOTES_PASUM group."""
-    if update.effective_chat.id == NOTES_PASUM:
-        user = update.effective_user
-        # Always prefer username
-        if user.username:
-            globals.active_users.add((user.id, f"@{user.username}"))
-        else:
-            # no username fallback
-            globals.active_users.add((user.id, user.full_name))
+    """Track every user who speaks in NOTES_PASUM."""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    # Only track if message is in the NOTES_PASUM group
+    if chat and chat.id == NOTES_PASUM and user:
+        display_name = f"@{user.username}" if user.username else user.full_name
+        globals.active_users.add((user.id, display_name))
+
+        # (optional) Debug log
+        print(f"Tracked active: {display_name} ({user.id})")
+
 
 async def pasum_match(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """DMs user random PASUM matches from active pool."""
