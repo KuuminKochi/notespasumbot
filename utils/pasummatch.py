@@ -14,7 +14,7 @@ ADMIN_NOTES = int(os.getenv("ADMIN_NOTES"))
 # Track active users (people who messaged in NOTES_PASUM group)
 async def track_active(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Tracks users who messaged in NOTES_PASUM group."""
-    if update.effective_chat.id == globals.NOTES_PASUM:
+    if update.effective_chat.id == NOTES_PASUM:
         user = update.effective_user
         # Always prefer username
         if user.username:
