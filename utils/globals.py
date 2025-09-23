@@ -26,3 +26,35 @@ That's all! Simple right? 😁
 These are some alternative commands I can do:
 /pasummatch - This was made due to the incessant request of Arman Roommate Anthonny
 """
+
+TUTORIAL_ANSWERS = """
+Faith Law's Tutorial Answers (For reference):
+
+Chemistry ;
+T1-2 General Chem ; https://drive.google.com/file/d/1PxIzVqDXbje2HPg5fnvRnwmSPKKgdeni/view?usp=drivesdk
+T3 States of Matter ; https://drive.google.com/file/d/1-TzgLXINKo-ysUq5sBnhthHEuT3f2hfK/view?usp=drivesdk
+T4 Atomic Structure ; https://drive.google.com/file/d/1rPR78qDGTWhJJdzRSIHdPcNjaEpJgtMu/view?usp=drivesdk
+T5 PTE pt.1 ; https://drive.google.com/file/d/167mALpmofdttN73HLHqEBRpdYXqnhHL9/view?usp=drivesdk
+T6 PTE pt.2 ; https://drive.google.com/file/d/1teuIWFm-XbnxeMrJTZlixXqWqU3ixLak/view?usp=drivesdk
+
+Physics ;
+https://drive.google.com/drive/folders/1OcQLAAquqXZADKEa-sNlAmaoch7sNTiQ
+
+Maths ;
+https://drive.google.com/drive/folders/181DJTteyZg6oIUcH7_E9dSjm4ZdaM6sW
+
+Advanced Mathematics ;
+https://drive.google.com/drive/folders/1mhu8HySUjz60Tj28fnp-FFGdyd0dsoG2
+
+Programming ;
+https://drive.google.com/drive/folders/1r4_Q-iMid-j5Ge9KXIAOTMLfBbSOcg_X
+
+Let's all say "Thanks, Faith!"
+"""
+
+LECTURE_NOTES = """
+SPeCTRUM - https://spectrum.um.edu.my/my/courses.php
+Lecture Notes and Tutorials - https://drive.google.com/drive/u/0/folders/1CUHpAQTSco5Mw4trLUR6setVAX9E7wNl
+
+Message @AnthonNYN if anything is missing!
+"""

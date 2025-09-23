@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from dotenv import load_dotenv
-from utils import pipequestions, pipeanswers, start, getid, pasummatch, help
+from utils import pipequestions, pipeanswers, start, getid, pasummatch, help, tutorialanswers
 import os
 
 load_dotenv()
@@ -33,6 +33,16 @@ app.add_handler(CommandHandler(
 app.add_handler(CommandHandler(
     "help",
     help.help_message
+))
+
+app.add_handler(CommandHandler(
+    "tutorials",
+    tutorialanswers.tutorial_answers
+))
+
+app.add_handler(CommandHandler(
+    "lecturenotes",
+    tutorialanswers.tutorial_answers
 ))
 
 app.add_handler(MessageHandler(
