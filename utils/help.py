@@ -11,4 +11,7 @@ NOTES_PASUM = int(os.getenv("NOTES_PASUM"))
 ADMIN_NOTES = int(os.getenv("ADMIN_NOTES"))
 
 async def help_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id == NOTES_PASUM:
+        await update.message.reply_text(globals.WARNING)
+        return
     await update.message.reply_text(globals.HELP)

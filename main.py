@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from dotenv import load_dotenv
-from utils import lecturenotes, pipequestions, pipeanswers, start, getid, pasummatch, help, tutorialanswers
+from utils import lecturenotes, pipequestions, pipeanswers, start, getid, pasummatch, help, tutorialanswers, mid_sem
 import os
 
 load_dotenv()
@@ -45,14 +45,20 @@ app.add_handler(CommandHandler(
     lecturenotes.lecture_notes
 ))
 
-app.add_handler(MessageHandler(
-    filters.ALL & filters.Chat(NOTES_PASUM),
-    pasummatch.track_active
+app.add_handler(CommandHandler(
+    "midsem",
+    mid_sem.mid_sem
 ))
 
 # Run pasum_match
 app.add_handler(CommandHandler(
-    "pasummatch", pasummatch.pasum_match
+    "pasummatch",
+    pasummatch.pasum_match
+))
+
+app.add_handler(MessageHandler(
+    filters.ALL & filters.Chat(NOTES_PASUM),
+    pasummatch.track_active
 ))
 
 app.run_polling()
