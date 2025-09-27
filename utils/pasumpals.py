@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
+NOTES_PASUM = int(os.getenv("NOTES_PASUM"))
+ADMIN_NOTES = int(os.getenv("ADMIN_NOTES"))
 
 DATA_FILE = "users.json"
 if not os.path.exists(DATA_FILE):
@@ -30,11 +32,17 @@ def save_data(data):
 
 # Registration process
 async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id == NOTES_PASUM:
+        await update.message.reply_text(globals.WARNING)
+        return
     await update.message.reply_text("Send a picture that shows your personality!")
     return PHOTO
 
 
 async def save_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id == NOTES_PASUM:
+        await update.message.reply_text(globals.WARNING)
+        return
     user = update.effective_user
     photo = update.message.photo[-1]
     file_id = photo.file_id
@@ -44,6 +52,9 @@ async def save_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def save_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id == NOTES_PASUM:
+        await update.message.reply_text(globals.WARNING)
+        return
     user = update.effective_user
     desc = update.message.text.strip()[:200]
     data = load_data()
@@ -59,12 +70,18 @@ async def save_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id == NOTES_PASUM:
+        await update.message.reply_text(globals.WARNING)
+        return
     await update.message.reply_text("❌ Registration cancelled.")
     return ConversationHandler.END
 
 
 # Show own profile
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id == NOTES_PASUM:
+        await update.message.reply_text(globals.WARNING)
+        return
     user = update.effective_user
     data = load_data()
     if str(user.id) not in data:
@@ -82,6 +99,9 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Show a random PASUM student
 import random
 async def random_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id == NOTES_PASUM:
+        await update.message.reply_text(globals.WARNING)
+        return
     data = load_data()
     if not data:
         await update.message.reply_text("No PASUM profiles yet.")
