@@ -1,7 +1,7 @@
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
 from dotenv import load_dotenv
-from utils import lecturenotes, pipequestions, pipeanswers, start, getid, pasummatch, help, tutorialanswers, mid_sem
+from utils import lecturenotes, pipequestions, pipeanswers, start, getid, pasummatch, help, tutorialanswers, mid_sem, pasumpals
 import os
 
 load_dotenv()
@@ -11,6 +11,7 @@ NOTES_PASUM = int(os.getenv("NOTES_PASUM"))
 ADMIN_NOTES = int(os.getenv("ADMIN_NOTES"))
 
 app = Application.builder().token(API_KEY).build()
+
 
 app.add_handler(MessageHandler(
     filters.ChatType.PRIVATE & ~filters.COMMAND,
@@ -60,5 +61,9 @@ app.add_handler(MessageHandler(
     filters.ALL & filters.Chat(NOTES_PASUM),
     pasummatch.track_active
 ))
+
+app.add_handler(pasumpals.conv)
+app.add_handler(CommandHandler("profile", pasumpals.profile))
+app.add_handler(CommandHandler("random", pasumpals.random_profile))
 
 app.run_polling()
