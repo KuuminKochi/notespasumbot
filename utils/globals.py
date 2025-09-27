@@ -65,6 +65,9 @@ Message @AnthonNYN if anything is missing!
 """
 
 MID_SEM = """
+*Check MUET*
+https://mecea.mpm.edu.my/MUETD/index.php
+
 *UPS Sem 1*
 
 *FAD1013 Mathematics I*
