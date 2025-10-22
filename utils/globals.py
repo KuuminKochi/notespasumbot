@@ -34,26 +34,27 @@ These are some alternative commands I can do:
 TUTORIAL_ANSWERS = """
 Faith Law's Tutorial Answers (For reference):
 
-Chemistry ;
-T1-2 General Chem ; https://drive.google.com/file/d/1PxIzVqDXbje2HPg5fnvRnwmSPKKgdeni/view?usp=drivesdk
-T3 States of Matter ; https://drive.google.com/file/d/1-TzgLXINKo-ysUq5sBnhthHEuT3f2hfK/view?usp=drivesdk
-T4 Atomic Structure ; https://drive.google.com/file/d/1rPR78qDGTWhJJdzRSIHdPcNjaEpJgtMu/view?usp=drivesdk
-T5 PTE pt.1 ; https://drive.google.com/file/d/167mALpmofdttN73HLHqEBRpdYXqnhHL9/view?usp=drivesdk
-T6 PTE pt.2 ; https://drive.google.com/file/d/1teuIWFm-XbnxeMrJTZlixXqWqU3ixLak/view?usp=drivesdk
+Mathematics:
+https://drive.google.com/drive/folders/1cXHcBxx-c6gw6MaeNjsUOoDB02lpmbEe
 
-Physics ;
-https://drive.google.com/drive/folders/1OcQLAAquqXZADKEa-sNlAmaoch7sNTiQ
+Advanced Mathematics:
+https://drive.google.com/drive/folders/1AxKhn_FQ0NQ0MKjSjRhHLYsyHY7Md85b
 
-Maths ;
-https://drive.google.com/drive/folders/181DJTteyZg6oIUcH7_E9dSjm4ZdaM6sW
+Chemistry:
+https://drive.google.com/drive/folders/1QwxeAQBRaiTA6lU7OMnK-ZrkXkSkC7q5
 
-Advanced Mathematics ;
-https://drive.google.com/drive/folders/1mhu8HySUjz60Tj28fnp-FFGdyd0dsoG2
-
-Programming ;
-https://drive.google.com/drive/folders/1r4_Q-iMid-j5Ge9KXIAOTMLfBbSOcg_X
+Physics:
+https://drive.google.com/drive/folders/1FJGivZOmhWhb1Bzov1zdoWl2U3NwBuUW
 
 Let's all say "Thanks, Faith!"
+
+Anthonny's Tutorial Answers (Tutorial 10 and Onwards):
+https://drive.google.com/drive/folders/19uqPopybpk72RhcGBKkJF_ANGmFn6EBw
+"""
+
+JOTTED_NOTES = """
+Anthonny's Jotted Notes:
+https://drive.google.com/drive/folders/1eFzchsHLkviLTfIOjuoRMVoCnx2wkZK0
 """
 
 LECTURE_NOTES = """
