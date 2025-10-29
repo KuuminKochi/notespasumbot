@@ -48,11 +48,12 @@ https://drive.google.com/drive/folders/1FJGivZOmhWhb1Bzov1zdoWl2U3NwBuUW
 
 Let's all say "Thanks, Faith!"
 
-Anthonny's Tutorial Answers (Tutorial 10 and Onwards):
+Anthonny's Tutorial Answers (Tutorial 10 and Onwards - WARNING: UPLOADED AS SOON AS POSSIBLE, UPDATED AFTER TUTORIAL DISCUSSION!):
 https://drive.google.com/drive/folders/19uqPopybpk72RhcGBKkJF_ANGmFn6EBw
 """
 
 JOTTED_NOTES = """
+Hi, this update was made in F2 Lecture group at the DKU!!!!! :3
 Anthonny's Jotted Notes:
 https://drive.google.com/drive/folders/1eFzchsHLkviLTfIOjuoRMVoCnx2wkZK0
 """
@@ -61,13 +62,20 @@ LECTURE_NOTES = """
 SPeCTRUM - https://spectrum.um.edu.my/my/courses.php
 Physical Lecture Notes and Tutorials - https://drive.google.com/drive/u/0/folders/1CUHpAQTSco5Mw4trLUR6setVAX9E7wNl
 Social Science Lecture Notes and Tutorials - https://drive.google.com/drive/u/1/folders/1-KUyNtiMlLY38eKQJGp67racKvRNNAFx
+*Check MUET*
+https://mecea.mpm.edu.my/MUETD/index.php
 
 Message @AnthonNYN if anything is missing!
 """
 
+
+
+
+
+
+
+
 MID_SEM = """
-*Check MUET*
-https://mecea.mpm.edu.my/MUETD/index.php
 
 *UPS Sem 1*
 
