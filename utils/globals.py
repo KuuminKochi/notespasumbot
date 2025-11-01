@@ -2,7 +2,6 @@ question_map = {}  # {admin_msg_id: (q_text, asker, asker_id, media)}
 active_users = set()  # { (user_id, username/full_name) }
 
 WARNING = """
-Please talk to me in DMs 😅
 """
 
 INTRODUCTION = """
@@ -32,6 +31,11 @@ These are some alternative commands I can do:
 """
 
 TUTORIAL_ANSWERS = """
+Anthonny's Tutorial Answers (Tutorial 10 and Onwards - WARNING: UPLOADED AS SOON AS POSSIBLE, UPDATED AFTER TUTORIAL DISCUSSION!):
+https://drive.google.com/drive/folders/19uqPopybpk72RhcGBKkJF_ANGmFn6EBw
+"""
+
+OLD_TUTORIAL_ANSWERS = """
 Faith Law's Tutorial Answers (For reference):
 
 Mathematics:
@@ -53,7 +57,6 @@ https://drive.google.com/drive/folders/19uqPopybpk72RhcGBKkJF_ANGmFn6EBw
 """
 
 JOTTED_NOTES = """
-Hi, this update was made in F2 Lecture group at the DKU!!!!! :3
 Anthonny's Jotted Notes:
 https://drive.google.com/drive/folders/1eFzchsHLkviLTfIOjuoRMVoCnx2wkZK0
 """
