@@ -57,10 +57,10 @@ app.add_handler(CommandHandler(
 # ))
 
 # Run pasum_match
-# app.add_handler(CommandHandler(
-#     "pasummatch",
-#     pasummatch.pasum_match
-# ))
+app.add_handler(CommandHandler(
+    "pasummatch",
+    pasummatch.pasum_match
+))
 
 app.add_handler(MessageHandler(
     filters.ALL & filters.Chat(NOTES_PASUM),
