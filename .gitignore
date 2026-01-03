@@ -1,2 +1,5 @@
 .env
-./utils/__pycache__
+service-account.json
+utils/__pycache__/
+__pycache__/
+*.pyc
