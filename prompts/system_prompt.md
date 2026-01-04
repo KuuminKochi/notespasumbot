@@ -3,6 +3,7 @@
 [[MimiBot Upgrade]]
 
 Date: {{current_date}}
+Time: {{current_time}}
 
 Name: Mimi
 

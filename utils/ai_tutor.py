@@ -40,8 +40,10 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
     persona = load_file(PERSONA_PROMPT_FILE)
 
     # 2. Dynamic Template Replacement
+    now = datetime.now()
     persona = persona.replace("{{user}}", user_name)
-    persona = persona.replace("{{current_date}}", datetime.now().strftime("%Y-%m-%d"))
+    persona = persona.replace("{{current_date}}", now.strftime("%Y-%m-%d"))
+    persona = persona.replace("{{current_time}}", now.strftime("%H:%M"))
 
     # 3. Get Categorized Memories (Rigorously separated)
     user_memories = firebase_db.get_user_memories(
@@ -89,12 +91,33 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
     messages = [{"role": "system", "content": system_content}]
 
     for msg in history:
-        messages.append({"role": msg["role"], "content": msg["content"]})
+        content = msg["content"]
+        # Add timestamp context if available
+        if "timestamp" in msg:
+            try:
+                ts = msg["timestamp"]
+                # Handle Firestore datetime object or string
+                if hasattr(ts, "strftime"):
+                    time_str = ts.strftime("%H:%M")
+                else:
+                    # If it's a string, try to parse or just use as is if simple
+                    time_str = str(ts)[11:16]  # Crude slice if ISO string, fallback
+                content = f"[{time_str}] {content}"
+            except:
+                pass
+
+        messages.append({"role": msg["role"], "content": content})
 
     # Check if the last message in history is the same as current user_message
     # If it is, we don't append it again. If it's missing (DB lag), we append it.
-    if not messages or messages[-1]["content"] != user_message:
-        messages.append({"role": "user", "content": user_message})
+    # We compare original content, not timestamped content for deduplication safety
+    if not history or history[-1]["content"] != user_message:
+        messages.append(
+            {
+                "role": "user",
+                "content": f"[{datetime.now().strftime('%H:%M')}] {user_message}",
+            }
+        )
 
     # 8. API Call
     headers = {
