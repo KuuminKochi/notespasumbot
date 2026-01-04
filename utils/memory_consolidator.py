@@ -13,6 +13,7 @@ KL_TZ = pytz.timezone("Asia/Kuala_Lumpur")
 def extract_memories(user_id, user_text, assistant_text):
     """
     Extracts high-value facts about the USER only.
+    Mimi self-reflections are strictly forbidden to prevent personality drift.
     """
     if not OPENROUTER_API_KEY:
         return
@@ -22,11 +23,32 @@ def extract_memories(user_id, user_text, assistant_text):
     User: "{user_text}"
     Mimi: "{assistant_text}"
 
-    Task: Extract only TRULY NEW and SIGNIFICANT facts about the STUDENT.
-    Focus on: Academic struggles/strengths, Specific goals, Personal preferences.
-    DO NOT extract anything about Mimi.
+    Task: Extract ONLY high-impact, TRULY NEW facts about the STUDENT.
+    Focus exclusively on:
+    - Specific academic milestones (exams, grades)
+    - Permanent learning preferences
+    - Critical personal context (name, major, life changes)
 
-    Output JSON: {{"user_facts": ["Fact 1"]}}
+    IGNORE: Small talk, transient moods, redundant info, or anything about Mimi's actions.
+    If nothing CRITICAL is found, return an empty list.
+
+    Output JSON: {{"user_facts": ["High-impact Fact"]}}
+    """
+
+    if not OPENROUTER_API_KEY:
+        return
+
+    prompt = f"""
+    Analyze this conversation turn between a student and Mimi (AI Tutor).
+    User: "{user_text}"
+    Mimi: "{assistant_text}"
+
+    Task: Extract ONLY high-impact, TRULY NEW facts about the STUDENT.
+    Focus exclusively on: academic milestones (exams, grades), permanent learning preferences, critical personal context.
+    IGNORE: Small talk, transient moods, redundant info, or anything about Mimi.
+    If nothing CRITICAL is found, return an empty list.
+
+    Output JSON: {{"user_facts": ["High-impact Fact"]}}
     """
 
     headers = {
@@ -66,14 +88,14 @@ def extract_memories(user_id, user_text, assistant_text):
 
 
 def check_and_compress(user_id, category):
-    memories = firebase_db.get_user_memories(user_id, category=category, limit=50)
-    if len(memories) <= 16:
+    memories = firebase_db.get_user_memories(user_id, category=category, limit=30)
+    if len(memories) <= 8:
         return
 
     print(f"📦 Compressing {len(memories)} {category} memories for {user_id}...")
     memory_list = [m.get("content") for m in memories]
 
-    prompt = f'Compress these student memories into 8-10 high-density insights: {json.dumps(memory_list)}. Output JSON: {{"compressed": []}}'
+    prompt = f'Compress these student memories into 4-6 high-density, vital insights. Focus only on academic milestones and core preferences. Wipe small talk: {json.dumps(memory_list)}. Output JSON: {{"compressed": []}}'
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",

@@ -197,3 +197,35 @@ def is_admin(user_id):
     # Check DB
     admins = get_admins()
     return str(user_id) in admins
+
+
+def hard_reset_user_data(telegram_id):
+    """
+    Completely wipes a user's conversation history and memories.
+    """
+    if not db:
+        return
+    user_ref = db.collection("users").document(str(telegram_id))
+
+    # 1. Clear Conversations
+    convs = user_ref.collection("conversations").stream()
+    batch = db.batch()
+    for doc in convs:
+        batch.delete(doc.reference)
+    batch.commit()
+
+    # 2. Clear Memories
+    mems = user_ref.collection("memories").stream()
+    batch = db.batch()
+    for doc in mems:
+        batch.delete(doc.reference)
+    batch.commit()
+
+    # 3. Clear Profile
+    user_ref.update(
+        {
+            "psych_profile": firestore.DELETE_FIELD,
+            "profile_tags": firestore.DELETE_FIELD,
+            "last_profile_update": firestore.DELETE_FIELD,
+        }
+    )

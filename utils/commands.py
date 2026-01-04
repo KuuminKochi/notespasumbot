@@ -4,12 +4,15 @@ from . import firebase_db, memory_consolidator
 import asyncio
 
 
-async def reset_context(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def hard_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Resets the conversation context for the user.
+    Completely wipes the user's data (conversations, memories, profile).
     """
+    user_id = update.effective_user.id
+    firebase_db.hard_reset_user_data(user_id)
     await update.message.reply_text(
-        "🔄 My short-term memory of our current conversation has been reset! (But I still remember our long-term bond ✨)"
+        "🗑️ **Hard Reset Complete.**\n\nI have wiped all our previous conversations, memories, and your psychological profile. We're starting from a blank slate! ✨",
+        parse_mode="Markdown",
     )
 
 
