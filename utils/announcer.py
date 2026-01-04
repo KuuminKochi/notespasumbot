@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
-from utils import firebase_db, ai_tutor
+from utils import firebase_db, ai_tutor, concurrency
 import asyncio
 import os
 
@@ -102,7 +102,7 @@ async def announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if memories:
                     # Run AI in executor to prevent blocking
                     personal_note = await loop.run_in_executor(
-                        None,
+                        concurrency.get_pool(),
                         ai_tutor.generate_announcement_comment,
                         announcement_text,
                         memories,

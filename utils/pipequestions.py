@@ -1,7 +1,14 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
-from utils import globals, ai_tutor, firebase_db, memory_consolidator, vision
+from utils import (
+    globals,
+    ai_tutor,
+    firebase_db,
+    memory_consolidator,
+    vision,
+    concurrency,
+)
 import os
 import asyncio
 import datetime
@@ -56,8 +63,48 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Run DB update in background to prevent blocking main loop
         loop = asyncio.get_running_loop()
         loop.run_in_executor(
-            None, firebase_db.create_or_update_user, telegram_id, user_data
+            concurrency.get_pool(),
+            firebase_db.create_or_update_user,
+            telegram_id,
+            user_data,
         )
+    except Exception as e:
+        print(f"DB Error: {e}")
+
+    # 3. Handle Text (AI Tutor) - Only if NO photo found
+    if text:
+        if len(text) < 2:
+            return  # Ignore very short messages
+
+        await context.bot.send_chat_action(
+            chat_id=update.effective_chat.id, action=ChatAction.TYPING
+        )
+
+        # Run AI in executor with HIGH CONCURRENCY POOL
+        # Loop already acquired above or get new one
+        if "loop" not in locals():
+            loop = asyncio.get_running_loop()
+
+        response = await loop.run_in_executor(
+            concurrency.get_pool(),
+            ai_tutor.get_ai_response,
+            telegram_id,
+            text,
+            asker_name,
+        )
+
+        # Send AI response (Reply to message to handle threads in supergroups)
+        await update.message.reply_text(response)
+
+        # 4. Memory Extraction
+        async def run_extraction_task():
+            await loop.run_in_executor(
+                concurrency.get_pool(),
+                memory_consolidator.extract_memories,
+                telegram_id,
+                text,
+                response,
+            )
     except Exception as e:
         print(f"DB Error: {e}")
 
