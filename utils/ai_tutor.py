@@ -76,7 +76,13 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
         messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": user_message})
 
-    # 7. API Call
+    # 7. Pre-log user message to ensure history continuity (Memory Fix)
+    try:
+        firebase_db.log_conversation(telegram_id, "user", user_message)
+    except Exception as e:
+        print(f"Failed to log user message: {e}")
+
+    # 8. API Call
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
         "Content-Type": "application/json",
@@ -95,8 +101,13 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
         )
         if response.status_code == 200:
             ai_text = response.json()["choices"][0]["message"]["content"]
-            firebase_db.log_conversation(telegram_id, "user", user_message)
-            firebase_db.log_conversation(telegram_id, "assistant", ai_text)
+
+            # Log assistant response
+            try:
+                firebase_db.log_conversation(telegram_id, "assistant", ai_text)
+            except Exception as e:
+                print(f"Failed to log AI message: {e}")
+
             return ai_text
         else:
             return f"Error from AI: {response.status_code} - {response.text}"

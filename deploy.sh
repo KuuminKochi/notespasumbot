@@ -61,19 +61,20 @@ ssh -i "$SSH_KEY" "$SERVER" "
 "
 
 # Create systemd service
-echo "🔧 Setting up systemd service..."
+echo "🔧 Setting up hardened systemd service..."
 ssh -i "$SSH_KEY" "$SERVER" "cat > /etc/systemd/system/$SERVICE_NAME.service << 'EOF'
 [Unit]
-Description=NotesPASUMBot
+Description=NotesPASUMBot (Hardened)
 After=network.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=$REPO_DIR
-ExecStart=/usr/bin/python3 $REPO_DIR/main.py
+ExecStart=/bin/bash $REPO_DIR/run_loop.sh
 Restart=always
-RestartSec=10
+RestartSec=1
 StandardOutput=journal
 StandardError=journal
 
@@ -84,6 +85,7 @@ EOF"
 # Enable and start service
 echo "🚀 Enabling and starting service..."
 ssh -i "$SSH_KEY" "$SERVER" "
+  chmod +x $REPO_DIR/run_loop.sh
   systemctl daemon-reload
   systemctl enable $SERVICE_NAME
   systemctl restart $SERVICE_NAME

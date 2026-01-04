@@ -70,6 +70,41 @@ app.add_handler(pasumpals.conv)
 app.add_handler(CommandHandler("profile", pasumpals.profile))
 app.add_handler(CommandHandler("random", pasumpals.random_profile))
 
+import logging
+import time
+import sys
+
+# Configure logging
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(__name__)
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log the error and send a telegram message to notify the developer."""
+    logger.error(f"Exception while handling an update: {context.error}")
+
+
 if __name__ == "__main__":
-    print("Mimi Notes Bot is running...")
-    app.run_polling()
+    print("Mimi Notes Bot is starting...")
+
+    # Add error handler
+    app.add_error_handler(error_handler)
+
+    while True:
+        try:
+            print("🚀 Starting polling loop...")
+            app.run_polling(
+                allowed_updates=Update.ALL_TYPES, drop_pending_updates=False
+            )
+        except Exception as e:
+            print(f"❌ CRITICAL ERROR: {e}")
+            logger.critical(f"Bot crashed with error: {e}", exc_info=True)
+            print("🔄 Restarting in 5 seconds...")
+            time.sleep(5)
+        except KeyboardInterrupt:
+            print("🛑 Bot stopped by user.")
+            break
