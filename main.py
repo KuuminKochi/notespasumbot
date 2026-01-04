@@ -77,12 +77,14 @@ app.add_handler(CommandHandler("random", pasumpals.random_profile))
 import logging
 import time
 import sys
+import traceback
+import html
 
 # Configure logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
-    handlers=[logging.StreamHandler(sys.stdout)],
+    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("bot_errors.log")],
 )
 logger = logging.getLogger(__name__)
 
@@ -90,6 +92,24 @@ logger = logging.getLogger(__name__)
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log the error and send a telegram message to notify the developer."""
     logger.error(f"Exception while handling an update: {context.error}")
+
+    tb_list = traceback.format_exception(
+        None, context.error, context.error.__traceback__
+    )
+    tb_string = "".join(tb_list)
+
+    message = (
+        f"🚨 <b>An exception occurred while handling an update</b>\n"
+        f"<pre>{html.escape(tb_string[-4000:])}</pre>"
+    )
+
+    if ADMIN_NOTES:
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_NOTES, text=message, parse_mode="HTML"
+            )
+        except:
+            print("Failed to send error alert to admin.")
 
 
 if __name__ == "__main__":
