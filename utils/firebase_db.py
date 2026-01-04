@@ -150,3 +150,41 @@ def get_all_user_profiles(limit=50):
         data["id"] = doc.id
         profiles.append(data)
     return profiles
+
+
+def add_admin(user_id):
+    """Adds a user ID to the admins list."""
+    if not db:
+        return
+    db.collection("settings").document("admins").set({str(user_id): True}, merge=True)
+
+
+def remove_admin(user_id):
+    """Removes a user ID from the admins list."""
+    if not db:
+        return
+    db.collection("settings").document("admins").update(
+        {str(user_id): firestore.DELETE_FIELD}
+    )
+
+
+def get_admins():
+    """Returns a list of admin IDs (strings)."""
+    if not db:
+        return []
+    doc = db.collection("settings").document("admins").get()
+    if doc.exists:
+        return list(doc.to_dict().keys())
+    return []
+
+
+def is_admin(user_id):
+    """Checks if a user is an admin (Env Root or DB Admin)."""
+    # Check Env Root
+    root_admin = os.getenv("ADMIN_NOTES", "0")
+    if str(user_id) == str(root_admin):
+        return True
+
+    # Check DB
+    admins = get_admins()
+    return str(user_id) in admins

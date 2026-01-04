@@ -22,6 +22,7 @@ from utils import (
     jottednotes,
     commands,
     announcer,
+    admin_manager,
 )
 import os
 
@@ -53,6 +54,8 @@ app.add_handler(CommandHandler("reset", commands.reset_context))
 app.add_handler(CommandHandler("memories", commands.show_memories))
 app.add_handler(CommandHandler("reprofile", commands.reprofile))
 app.add_handler(CommandHandler("announce", announcer.announce))
+app.add_handler(CommandHandler("addadmin", admin_manager.add_admin))
+app.add_handler(CommandHandler("removeadmin", admin_manager.remove_admin))
 
 # --- Matching & Admin Handlers ---
 app.add_handler(

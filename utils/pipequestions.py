@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
-from utils import globals, ai_tutor, firebase_db, memory_consolidator
+from utils import globals, ai_tutor, firebase_db, memory_consolidator, vision
 import os
 import asyncio
 import datetime
@@ -16,27 +16,34 @@ ADMIN_NOTES = int(os.getenv("ADMIN_NOTES", 0))
 
 
 async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.effective_chat or update.effective_chat.type != "private":
+    chat_type = update.effective_chat.type if update.effective_chat else ""
+    user = update.effective_user
+    if not user or not update.message:
         return
 
-    if not update.message:
+    # --- Supergroup Logic ---
+    if chat_type in ["group", "supergroup"]:
+        # Only reply if mentioned or replying to bot
+        is_reply_to_bot = (
+            update.message.reply_to_message
+            and update.message.reply_to_message.from_user.id == context.bot.id
+        )
+        is_mention = f"@{context.bot.username}" in (update.message.text or "")
+
+        if not (is_reply_to_bot or is_mention):
+            return
+
+    # --- Private Chat Logic ---
+    elif chat_type == "private":
+        pass  # Process everything
+    else:
         return
 
     text = (update.message.text or update.message.caption or "").strip()
-    user = update.effective_user
-    if not user:
-        return
-
     asker_name = user.first_name or "Student"
     telegram_id = user.id
 
-    if not text and not (
-        update.message.photo
-        or update.message.document
-        or update.message.video
-        or update.message.voice
-        or update.message.audio
-    ):
+    if not text and not (update.message.photo or update.message.document):
         return
 
     # 1. Firebase Profile Check & Update
@@ -51,13 +58,7 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"DB Error: {e}")
 
     # 2. Handle Text (AI Tutor)
-    if text and not (
-        update.message.photo
-        or update.message.document
-        or update.message.video
-        or update.message.voice
-        or update.message.audio
-    ):
+    if text and not update.message.photo:
         if len(text) < 2:
             return  # Ignore very short messages
 
@@ -71,10 +72,10 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
             None, ai_tutor.get_ai_response, telegram_id, text, asker_name
         )
 
-        # Send AI response
+        # Send AI response (Reply to message to handle threads in supergroups)
         await update.message.reply_text(response)
 
-        # 3. BACKGROUND TASK: Memory Extraction (Non-blocking)
+        # 3. Memory Extraction
         async def run_extraction_task():
             await loop.run_in_executor(
                 None, memory_consolidator.extract_memories, telegram_id, text, response
@@ -82,59 +83,13 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         asyncio.create_task(run_extraction_task())
 
-        # Log to Admin (Silent Monitor)
-        if ADMIN_NOTES:
-            try:
-                await context.bot.send_message(
-                    chat_id=ADMIN_NOTES,
-                    text=f"🤖 AI Replied to @{user.username or user.first_name}:\nQ: {text}\nA: {response[:100]}...",
-                )
-            except:
-                pass
+        # Privacy Update: Removed silent forwarding to admin
         return
 
-    # 4. Handle Media / Fallback (Forward to Admin)
-    sent = None
-    caption_text = f"Q from @{user.username or user.first_name} (Media):\n{text}"
-
+    # 4. Handle Media (Vision or File)
     if update.message.photo:
-        sent = await context.bot.send_photo(
-            chat_id=ADMIN_NOTES,
-            photo=update.message.photo[-1].file_id,
-            caption=caption_text,
-        )
-    elif update.message.document:
-        sent = await context.bot.send_document(
-            chat_id=ADMIN_NOTES,
-            document=update.message.document.file_id,
-            caption=caption_text,
-        )
-    elif update.message.video:
-        sent = await context.bot.send_video(
-            chat_id=ADMIN_NOTES,
-            video=update.message.video.file_id,
-            caption=caption_text,
-        )
-    elif update.message.audio:
-        sent = await context.bot.send_audio(
-            chat_id=ADMIN_NOTES,
-            audio=update.message.audio.file_id,
-            caption=caption_text,
-        )
-    elif update.message.voice:
-        sent = await context.bot.send_voice(
-            chat_id=ADMIN_NOTES,
-            voice=update.message.voice.file_id,
-            caption=caption_text,
-        )
+        await vision.process_image_question(update, context)
+        return
 
-    if sent:
-        globals.question_map[sent.message_id] = (
-            text,
-            user.username or user.first_name,
-            update.effective_chat.id,
-            ("media", None),
-        )
-        await update.message.reply_text(
-            "I've received your file! I'll pass it to a human admin."
-        )
+    # Fallback for other media (No admin forwarding per privacy request)
+    return
