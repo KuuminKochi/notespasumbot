@@ -88,48 +88,44 @@ def call_grok_vision(base64_img, prompt):
         "Authorization": f"Bearer {XAI_API_KEY}",
         "Content-Type": "application/json",
     }
-    payload = {
-        "model": "grok-4-1-fast-non-reasoning",  # Optimized for fast vision/description
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"},
-                    },
-                ],
-            }
-        ],
-        "stream": False,
-        "temperature": 0.01,
-    }
-    payload = {
-        "model": "grok-vision-beta",  # Or grok-2-vision-1212 if available
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"},
-                    },
-                ],
-            }
-        ],
-        "stream": False,
-        "temperature": 0.01,
-    }
 
-    try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=60)
-        if resp.status_code == 200:
-            return resp.json()["choices"][0]["message"]["content"]
-        print(f"Grok Error: {resp.text}")
-    except Exception as e:
-        print(f"Grok Exception: {e}")
+    # Try the requested fast model first, fallback to stable
+    models_to_try = ["grok-4-1-fast-non-reasoning", "grok-2-vision-1212"]
+
+    for model in models_to_try:
+        print(f"Trying Vision Model: {model}")
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_img}"
+                            },
+                        },
+                    ],
+                }
+            ],
+            "stream": False,
+            "temperature": 0.01,
+        }
+
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=60)
+            if resp.status_code == 200:
+                return resp.json()["choices"][0]["message"]["content"]
+
+            print(f"Grok {model} Error: {resp.text}")
+            # If 404/400 (Model not found), loop will try next.
+            # If 401 (Auth), it will fail for all anyway.
+
+        except Exception as e:
+            print(f"Grok Exception ({model}): {e}")
+
     return None
 
 
