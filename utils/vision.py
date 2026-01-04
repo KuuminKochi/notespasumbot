@@ -147,15 +147,20 @@ def call_deepseek_reasoner(prompt):
         "HTTP-Referer": "https://github.com/KuuminKochi/notespasumbot",
         "X-Title": "NotesPASUMBot",
     }
-    payload = {
-        "model": "deepseek/deepseek-r1",
-        "messages": [{"role": "user", "content": prompt}],
-    }
 
-    try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=120)
-        if resp.status_code == 200:
-            return resp.json()["choices"][0]["message"]["content"]
-    except:
-        pass
-    return "Failed to get reasoning."
+    # Try DeepSeek Reasoner first, then Mimo as fallback
+    models = ["deepseek/deepseek-r1", "xiaomi/mimo-v2-flash"]
+
+    for model in models:
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=120)
+            if resp.status_code == 200:
+                return resp.json()["choices"][0]["message"]["content"]
+        except:
+            continue
+
+    return "Failed to get reasoning after trying fallback."

@@ -16,6 +16,7 @@ KL_TZ = pytz.timezone("Asia/Kuala_Lumpur")
 
 # Model Selection (OpenRouter)
 CHAT_MODEL = "deepseek/deepseek-chat"
+FALLBACK_MODEL = "xiaomi/mimo-v2-flash"
 REASONER_MODEL = "deepseek/deepseek-r1"
 
 # Prompt Paths
@@ -88,36 +89,55 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
             {"role": "user", "content": f"[{now.strftime('%H:%M')}] {user_message}"}
         )
 
-    # 7. API Call
+    # 7. API Call with Fallback
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
         "HTTP-Referer": "https://github.com/KuuminKochi/notespasumbot",
         "X-Title": "NotesPASUMBot",
     }
-    payload = {
-        "model": CHAT_MODEL,
-        "messages": messages,
-        "temperature": 0.5,
-        "max_tokens": 1200,
-    }
 
-    try:
-        response = requests.post(
-            f"{BASE_URL}/chat/completions", headers=headers, json=payload, timeout=45
-        )
-        if response.status_code == 200:
-            res_json = response.json()
-            if "choices" in res_json:
-                ai_text = res_json["choices"][0]["message"]["content"]
-                ai_text = re.sub(r"^(\[\d{2}:\d{2}\]\s*)+", "", ai_text).strip()
-                firebase_db.log_conversation(telegram_id, "assistant", ai_text)
-                return ai_text
+    models_to_try = [CHAT_MODEL, FALLBACK_MODEL]
+    last_error = ""
+
+    for model in models_to_try:
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.5,
+            "max_tokens": 1200,
+        }
+
+        try:
+            response = requests.post(
+                f"{BASE_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=45,
+            )
+
+            if response.status_code == 200:
+                res_json = response.json()
+                if "choices" in res_json and len(res_json["choices"]) > 0:
+                    ai_text = res_json["choices"][0]["message"]["content"]
+                    ai_text = re.sub(r"^(\[\d{2}:\d{2}\]\s*)+", "", ai_text).strip()
+                    firebase_db.log_conversation(telegram_id, "assistant", ai_text)
+                    return ai_text
+                else:
+                    last_error = f"AI Error ({model}): Invalid response format."
+                    continue
+            elif response.status_code in [402, 429, 502, 503, 504]:
+                # Credits exhausted, Rate limit, or Server Error - Try next model
+                last_error = f"Provider Error ({model}): {response.status_code}"
+                continue
             else:
-                return f"AI Error: Received invalid response from provider: {res_json}"
-        return f"Error: {response.status_code} - {response.text}"
-    except Exception as e:
-        return f"Connection Error: {e}"
+                return f"Error: {response.status_code} - {response.text}"
+
+        except Exception as e:
+            last_error = f"Connection Error ({model}): {e}"
+            continue
+
+    return f"⚠️ All AI models failed. Last error: {last_error}"
 
 
 def generate_announcement_comment(announcement_text, user_memories):
