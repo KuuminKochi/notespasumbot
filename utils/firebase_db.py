@@ -136,20 +136,29 @@ def get_all_user_ids():
     return [doc.id for doc in docs]
 
 
-def get_all_user_profiles(limit=50):
+def clear_user_memories(telegram_id, category=None):
     """
-    Retrieves all user profiles for matching.
+    Deletes all memories for a user, optionally filtered by category.
+    Used during memory compression.
     """
     if not db:
-        return []
+        return
+    user_ref = db.collection("users").document(str(telegram_id))
+    query = user_ref.collection("memories")
+    if category:
+        query = query.where("category", "==", category)
 
-    docs = db.collection("users").limit(limit).stream()
-    profiles = []
+    docs = query.stream()
+    batch = db.batch()
+    count = 0
     for doc in docs:
-        data = doc.to_dict()
-        data["id"] = doc.id
-        profiles.append(data)
-    return profiles
+        batch.delete(doc.reference)
+        count += 1
+        if count >= 400:  # Firestore limit is 500
+            batch.commit()
+            batch = db.batch()
+            count = 0
+    batch.commit()
 
 
 def add_admin(user_id):
