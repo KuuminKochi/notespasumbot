@@ -10,23 +10,28 @@ BASE_URL = "https://openrouter.ai/api/v1"
 
 def extract_memories(user_id, user_text, assistant_text):
     """
-    Extracts new facts and Mimi's self-reflections.
-    Triggers compression if limit is exceeded.
+    Extracts high-value facts about the USER only.
+    Mimi self-reflections are strictly forbidden to prevent personality drift.
     """
     if not OPENROUTER_API_KEY:
         return
 
     prompt = f"""
-    Analyze this conversation turn.
+    Analyze this conversation turn between a student and Mimi (AI Tutor).
     User: "{user_text}"
     Mimi: "{assistant_text}"
 
-    Extract NEW, UNIQUE facts/traits into:
-    1. "user_facts": Facts about the student.
-    2. "mimi_reflections": Mimi's own growth/feelings about the relationship.
+    Task: Extract only TRULY NEW and SIGNIFICANT facts about the STUDENT.
+    Focus on:
+    - Academic struggles/strengths
+    - Specific goals or deadlines
+    - Personal preferences (e.g., learning style, name, subjects)
+    - Significant life events mentioned
 
-    Only extract if truly new and significant.
-    Output JSON: {{"user_facts": [], "mimi_reflections": []}}
+    DO NOT extract anything about Mimi's own behavior, feelings, or actions.
+    If nothing significant is found, return empty lists.
+
+    Output JSON: {{"user_facts": ["Fact 1", "Fact 2"]}}
     """
 
     headers = {
@@ -50,20 +55,15 @@ def extract_memories(user_id, user_text, assistant_text):
         if response.status_code == 200:
             data = json.loads(response.json()["choices"][0]["message"]["content"])
 
-            # 1. Save User Facts
-            for m in data.get("user_facts", []):
+            # Save ONLY User Facts
+            new_facts = data.get("user_facts", [])
+            for m in new_facts:
                 firebase_db.save_memory(user_id, m, category="User")
 
-            # 2. Save Mimi Reflections
-            for m in data.get("mimi_reflections", []):
-                firebase_db.save_memory(user_id, m, category="Mimi")
-
-            # 3. Trigger Compression Check
-            check_and_compress(user_id, "User")
-            check_and_compress(user_id, "Mimi")
-
-            # 4. Trigger profiling
-            check_and_update_profile(user_id)
+            # Trigger Compression Check for User memories only
+            if new_facts:
+                check_and_compress(user_id, "User")
+                check_and_update_profile(user_id)
 
     except Exception as e:
         print(f"Memory extraction failed: {e}")
@@ -73,7 +73,6 @@ def check_and_compress(user_id, category):
     """
     If memories exceed 16, compress them into high-density insights.
     """
-    # We fetch ALL memories for this category
     memories = firebase_db.get_user_memories(user_id, category=category, limit=50)
 
     if len(memories) <= 16:
@@ -84,10 +83,10 @@ def check_and_compress(user_id, category):
     memory_list = [m.get("content") for m in memories]
 
     prompt = f"""
-    The following are memories for the category: {category}.
-    They are becoming redundant/bloated. 
+    The following are memories about a student. 
     Compress these into exactly 8-10 high-density, unique, and significant insights.
-    Wipe out trivial or repeating info. Keep only the core essence.
+    Wipe out trivial, redundant, or outdated info. 
+    Keep only the core details that help a tutor understand the student's needs.
 
     Memories:
     {json.dumps(memory_list)}
@@ -114,12 +113,9 @@ def check_and_compress(user_id, category):
             new_memories = data.get("compressed", [])
 
             if new_memories:
-                # WIPE OLD
                 firebase_db.clear_user_memories(user_id, category=category)
-                # SAVE NEW
                 for m in new_memories:
                     firebase_db.save_memory(user_id, m, category=category)
-                print(f"✅ Compression successful for {category}")
     except Exception as e:
         print(f"Compression error: {e}")
 
@@ -129,13 +125,11 @@ def check_and_update_profile(user_id):
     if len(memories) < 3:
         return
 
-    # Check if we should update (limit frequency)
     user_data = firebase_db.get_user_profile(user_id)
     last_update = user_data.get("last_profile_update") if user_data else None
 
-    # Update only if 24 hours passed or no profile exists
     if last_update:
-        if isinstance(last_update, str):  # Handle string if iso
+        if isinstance(last_update, str):
             last_update = datetime.datetime.fromisoformat(last_update)
 
         diff = datetime.datetime.now() - last_update
@@ -153,12 +147,12 @@ def generate_psych_profile(user_id, memories):
     memory_text = "\n".join([f"- {m.get('content')}" for m in memories])
 
     prompt = f"""
-    Analyze student {user_name} based on these memories:
+    Analyze student {user_name} based on these academic/personal memories:
     {memory_text}
 
     Provide:
-    1. Psychological profile summary.
-    2. Tags.
+    1. A concise personality and learning profile.
+    2. Tags for quick identification.
     Output JSON: {{"profile": "...", "tags": []}}
     """
 
