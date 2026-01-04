@@ -13,17 +13,33 @@ from . import ai_tutor
 XAI_API_KEY = os.getenv("XAI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
+# Splash text rotation to avoid repetition
+last_splash_index = -1
+
 SPLASH_TEXTS = [
     "Mimi is sharpening her pencils...",
-    "Checking the library archives...",
+    "Checking library archives...",
     "Mimi is adjusting her hibiscus flower...",
-    "Consulting the PASUM scrolls...",
+    "Consulting PASUM scrolls...",
     "Mimi is having a quick tea break while thinking...",
     "Optimizing brain cells...",
-    "Scanning the cosmic background radiation...",
+    "Scanning cosmic background radiation...",
     "Mimi is flipping through her notes...",
-    "Analyzing the molecular structure of this query...",
+    "Analyzing molecular structure of this query...",
     "Mimi is doing some quick mental math...",
+    "Let me put on my reading glasses...",
+    "Mimi is zooming in on the details...",
+    "Time to activate thinking cap...",
+    "Channeling inner genius...",
+    "Mimi is organizing her thoughts...",
+    "Decoding the visual puzzle...",
+    "Processing with maximum brain power...",
+    "Mimi is cross-referencing her knowledge...",
+    "Bringing analytical focus to bear...",
+    "Mimi is doing a quick visual scan...",
+    "Preparing to unleash insight...",
+    "Mimi is summoning her academic expertise...",
+    "Deep diving into this problem...",
 ]
 
 
@@ -34,7 +50,12 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
     if not update.message:
         return
 
-    status_msg = await update.message.reply_text(f"👀 {random.choice(SPLASH_TEXTS)}")
+    # Rotate splash text to avoid repetition
+    global last_splash_index
+    last_splash_index = (last_splash_index + 1) % len(SPLASH_TEXTS)
+    splash_text = SPLASH_TEXTS[last_splash_index]
+
+    status_msg = await update.message.reply_text(f"👀 {splash_text}")
 
     try:
         # 1. Determine Photo Source
@@ -145,6 +166,14 @@ def call_vision_ai(base64_img, prompt):
         resp = requests.post(url, headers=headers, json=payload, timeout=35)
         if resp.status_code == 200:
             return resp.json()["choices"][0]["message"]["content"]
-    except:
-        pass
+        else:
+            print(f"ERROR: Vision API returned status {resp.status_code}")
+            print(f"Response body: {resp.text[:500]}")
+            return None
+    except requests.Timeout:
+        print("ERROR: Vision API timeout after 35s")
+        return None
+    except Exception as e:
+        print(f"ERROR: Vision API exception: {e}")
+        return None
     return None
