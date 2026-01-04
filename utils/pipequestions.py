@@ -61,8 +61,18 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"DB Error: {e}")
 
-    # 2. Handle Text (AI Tutor)
-    if text and not update.message.photo:
+    # 2. Check for Media/Vision FIRST (Prioritize Vision over Text)
+    # Check current message photo OR replied-to message photo
+    target_photo = update.message.photo
+    if not target_photo and update.message.reply_to_message:
+        target_photo = update.message.reply_to_message.photo
+
+    if target_photo:
+        await vision.process_image_question(update, context)
+        return
+
+    # 3. Handle Text (AI Tutor) - Only if NO photo found
+    if text:
         if len(text) < 2:
             return  # Ignore very short messages
 
@@ -82,7 +92,7 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Send AI response (Reply to message to handle threads in supergroups)
         await update.message.reply_text(response)
 
-        # 3. Memory Extraction
+        # 4. Memory Extraction
         async def run_extraction_task():
             await loop.run_in_executor(
                 None, memory_consolidator.extract_memories, telegram_id, text, response
@@ -90,18 +100,4 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         asyncio.create_task(run_extraction_task())
 
-        # Privacy Update: Removed silent forwarding to admin
         return
-
-    # 4. Handle Media (Vision or File)
-    # Check current message photo OR replied-to message photo
-    target_photo = update.message.photo
-    if not target_photo and update.message.reply_to_message:
-        target_photo = update.message.reply_to_message.photo
-
-    if target_photo:
-        await vision.process_image_question(update, context)
-        return
-
-    # Fallback for other media (No admin forwarding per privacy request)
-    return
