@@ -13,8 +13,9 @@ import requests
 import json
 import asyncio
 
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-BASE_URL = "https://api.deepseek.com/v1"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+BASE_URL = "https://openrouter.ai/api/v1"
+CHAT_MODEL = os.getenv("CHAT_MODEL", "xiaomi/mimo-v2-flash")
 
 
 async def track_active(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -63,7 +64,7 @@ async def pasum_match(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Select 5 random candidates
     candidates = random.sample(pool, min(5, len(pool)))
 
-    # 3. Use Deepseek to calculate compatibility
+    # 3. Use OpenRouter to calculate compatibility
     match_data = []
     for c in candidates:
         match_data.append(
@@ -93,13 +94,20 @@ Output JSON Format:
 }}
 """
 
+    # Check API key
+    if not OPENROUTER_API_KEY:
+        await update.message.reply_text("⚠️ OpenRouter API key not configured!")
+        return
+
     headers = {
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/KuuminKochi/notespasumbot",
+        "X-Title": "NotesPASUMBot",
     }
 
     payload = {
-        "model": "deepseek-chat",
+        "model": CHAT_MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.5,
         "response_format": {"type": "json_object"},
