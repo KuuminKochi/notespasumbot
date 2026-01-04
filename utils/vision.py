@@ -15,7 +15,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 async def process_image_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Analyzes images with Nemotron and solves with Reasoner or Chat (Streaming).
+    Analyzes images with Grok 4.1 Fast and solves with Reasoner or Chat (Streaming).
     """
     if not update.message:
         return
@@ -39,7 +39,7 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
         img_bytes = await photo_file.download_as_bytearray()
         base64_image = base64.b64encode(img_bytes).decode("utf-8")
 
-        # 2. Vision Analysis
+        # 2. Vision Analysis (Grok 4.1 Fast via OpenRouter)
         await status_msg.edit_text("🧠 Processing visual data...")
 
         vision_prompt = """
@@ -96,30 +96,41 @@ def call_vision_ai(base64_img, prompt):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/KuuminKochi/notespasumbot",
+        "X-Title": "NotesPASUMBot",
     }
 
-    # Try Nemotron Free
-    payload = {
-        "model": "nvidia/nemotron-nano-12b-v2-vl:free",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"},
-                    },
-                ],
-            }
-        ],
-        "temperature": 0.1,
-    }
+    # Reverted to Grok 4.1 Fast (Primary) with Grok 2 Vision (Fallback)
+    # Using OpenRouter IDs
+    models_to_try = ["x-ai/grok-4-1-fast-non-reasoning", "x-ai/grok-2-vision-1212"]
 
-    try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=60)
-        if resp.status_code == 200:
-            return resp.json()["choices"][0]["message"]["content"]
-    except:
-        pass
+    for model in models_to_try:
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_img}"
+                            },
+                        },
+                    ],
+                }
+            ],
+            "temperature": 0.1,
+        }
+
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=60)
+            if resp.status_code == 200:
+                res_json = resp.json()
+                if "choices" in res_json and len(res_json["choices"]) > 0:
+                    return res_json["choices"][0]["message"]["content"]
+        except:
+            continue
+
     return None
