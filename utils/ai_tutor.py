@@ -39,8 +39,7 @@ def load_file(path):
 
 async def stream_ai_response(update, context, status_msg, user_message, model_id=None):
     """
-    Streams AI response to Telegram.
-    Uses sliding window (limit 5) and selective memory (limit 8).
+    Streams AI response to Telegram using HTML mode.
     """
     telegram_id = update.effective_user.id
     user_name = update.effective_user.first_name or "Student"
@@ -55,7 +54,6 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
         .replace("{{current_time}}", now.strftime("%H:%M"))
     )
 
-    # Selective memory (limit 8)
     memories = firebase_db.get_user_memories(telegram_id, category="User", limit=8)
     memory_block = ""
     if memories:
@@ -63,13 +61,11 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
             [f"- {m.get('content')}" for m in memories]
         )
 
-    # Maintain personality in DeepSeek Reasoner
-    persona_instruction = "\n\nIMPORTANT: Maintain your personality as Mimi. Be friendly, Malaysian, academic but concise."
+    persona_instruction = "\n\nIMPORTANT: Maintain your personality as Mimi. Be friendly, Malaysian, academic but concise. ALWAYS use HTML tags for formatting (<i>italics</i>, <b>bold</b>, <code>code</code>)."
     system_content = (
         f"{global_rules}\n\n---\n\n{persona}{memory_block}{persona_instruction}"
     )
 
-    # Sliding window (limit 5)
     history = firebase_db.get_recent_context(telegram_id, limit=5)
 
     messages = [{"role": "system", "content": system_content}]
@@ -80,22 +76,18 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
             content = f"[{time_str}] {content}"
         messages.append({"role": msg["role"], "content": content})
 
-    # Final User Message
     messages.append(
         {"role": "user", "content": f"[{now.strftime('%H:%M')}] {user_message}"}
     )
 
-    # 2. Call API with Streaming
+    # 2. Call API
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
         "HTTP-Referer": "https://github.com/KuuminKochi/notespasumbot",
         "X-Title": "NotesPASUMBot",
     }
-
-    # Use selected model or default chat
     target_model = model_id or CHAT_MODEL
-
     payload = {
         "model": target_model,
         "messages": messages,
@@ -105,13 +97,10 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
 
     full_text = ""
     last_edit_time = 0
-    update_interval = 1.5
+    update_interval = 1.2
 
     try:
         loop = asyncio.get_running_loop()
-        # Initial status edit
-        await status_msg.edit_text("💭 Mimi is thinking...")
-
         response = await loop.run_in_executor(
             concurrency.get_pool(),
             lambda: requests.post(
@@ -124,13 +113,13 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
         )
 
         if response.status_code != 200:
-            # Try fallback if primary fails (e.g. 402)
             if target_model == CHAT_MODEL:
-                print(f"Fallback to {FALLBACK_MODEL}...")
                 return await stream_ai_response(
                     update, context, status_msg, user_message, FALLBACK_MODEL
                 )
-            await status_msg.edit_text(f"⚠️ Error: {response.status_code}")
+            await status_msg.edit_text(
+                f"⚠️ Error: {response.status_code}", parse_mode="HTML"
+            )
             return
 
         for line in response.iter_lines():
@@ -145,38 +134,37 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
                         content = chunk["choices"][0]["delta"].get("content", "")
                         full_text += content
 
-                        # Throttle updates
                         if time.time() - last_edit_time > update_interval:
                             clean_text = re.sub(
                                 r"^(\[\d{2}:\d{2}\]\s*)+", "", full_text
                             ).strip()
                             if clean_text:
                                 try:
-                                    await status_msg.edit_text(clean_text + " ▌")
+                                    # Use HTML parse mode for streaming updates
+                                    await status_msg.edit_text(
+                                        clean_text + " ▌", parse_mode="HTML"
+                                    )
                                     last_edit_time = time.time()
                                 except:
                                     pass
                     except:
                         pass
 
-        # Final Cleanup
         final_text = re.sub(r"^(\[\d{2}:\d{2}\]\s*)+", "", full_text).strip()
         if not final_text:
             final_text = "I'm sorry, I couldn't generate a response."
 
-        await status_msg.edit_text(final_text)
+        await status_msg.edit_text(final_text, parse_mode="HTML")
 
-        # Log to DB (Async)
         firebase_db.log_conversation(telegram_id, "user", user_message)
         firebase_db.log_conversation(telegram_id, "assistant", final_text)
 
     except Exception as e:
-        await status_msg.edit_text(f"⚠️ Error: {str(e)}")
+        await status_msg.edit_text(f"⚠️ Error: {str(e)}", parse_mode="HTML")
 
 
 def get_ai_response(telegram_id, user_message, user_name="Student"):
-    # This is now a dummy for backward compatibility or unused internal logic
-    return "Please use stream_ai_response instead."
+    return "Error: Use streaming."
 
 
 def generate_announcement_comment(announcement_text, user_memories):

@@ -45,7 +45,9 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
             photo_obj = update.message.reply_to_message.photo[-1]
 
         if not photo_obj:
-            await status_msg.edit_text("❌ No image found to process.")
+            await status_msg.edit_text(
+                "❌ No image found to process.", parse_mode="HTML"
+            )
             return
 
         # Download
@@ -54,7 +56,9 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
         base64_image = base64.b64encode(img_bytes).decode("utf-8")
 
         # 2. Vision Analysis
-        await status_msg.edit_text(f"🧠 {random.choice(SPLASH_TEXTS)}")
+        await status_msg.edit_text(
+            f"🧠 {random.choice(SPLASH_TEXTS)}", parse_mode="HTML"
+        )
 
         vision_prompt = """
         Describe this image exactly. If it is a math/science problem, transcribe all symbols and text.
@@ -62,15 +66,14 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
         Set is_complex to true if it requires deep reasoning or calculation.
         """
 
-        # Call vision with 25s timeout
+        # Call vision with 30s timeout
         vision_raw = await asyncio.to_thread(
             call_vision_ai, base64_image, vision_prompt
         )
         if not vision_raw:
             await status_msg.edit_text(
-                "❌ Mimi got a bit distracted (Vision Timeout). Trying fallback..."
+                "❌ Mimi got a bit distracted (Vision Timeout).", parse_mode="HTML"
             )
-            # Optional: Add fallback here if desired, or just exit.
             return
 
         # Parse Complexity
@@ -88,7 +91,9 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
 
         # 3. Decision
         action = "thinking" if is_complex else "analyzing"
-        await status_msg.edit_text(f"🤔 {random.choice(SPLASH_TEXTS)}")
+        await status_msg.edit_text(
+            f"🤔 {random.choice(SPLASH_TEXTS)}", parse_mode="HTML"
+        )
 
         model_id = "deepseek/deepseek-r1" if is_complex else "deepseek/deepseek-chat"
         reasoning_prompt = (
@@ -102,7 +107,7 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
 
     except Exception as e:
         try:
-            await status_msg.edit_text(f"⚠️ Error: {str(e)}")
+            await status_msg.edit_text(f"⚠️ Error: {str(e)}", parse_mode="HTML")
         except:
             pass
 
@@ -114,9 +119,11 @@ def call_vision_ai(base64_img, prompt):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/KuuminKochi/notespasumbot",
+        "X-Title": "NotesPASUMBot",
     }
 
-    # Nemotron Free with 30s timeout
+    # Nemotron Free with timeout
     payload = {
         "model": "nvidia/nemotron-nano-12b-v2-vl:free",
         "messages": [
@@ -135,12 +142,9 @@ def call_vision_ai(base64_img, prompt):
     }
 
     try:
-        # Added timeout to requests
-        resp = requests.post(url, headers=headers, json=payload, timeout=30)
+        resp = requests.post(url, headers=headers, json=payload, timeout=35)
         if resp.status_code == 200:
             return resp.json()["choices"][0]["message"]["content"]
-    except requests.exceptions.Timeout:
-        print("Vision AI Timed Out")
-    except Exception as e:
-        print(f"Vision Error: {e}")
+    except:
+        pass
     return None
