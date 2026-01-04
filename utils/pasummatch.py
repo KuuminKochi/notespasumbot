@@ -130,8 +130,8 @@ Output JSON Format:
                     f"{emoji} **{m.get('name')}** = {score}%\n_{m.get('comment')}_\n\n"
                 )
 
-            text += "✨ _Matches are calculated based on your unique student profiles._"
-            await update.message.reply_text(text, parse_mode="Markdown")
+            text += "✨ <i>Matches are calculated based on your unique student profiles.</i>"
+            await update.message.reply_text(text, parse_mode="HTML")
         else:
             await update.message.reply_text(
                 "Mimi's analytical engine hit a snag! Let's try again in a bit."

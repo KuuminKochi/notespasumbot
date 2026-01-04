@@ -166,6 +166,14 @@ def is_admin(user_id):
     return str(user_id) in get_admins()
 
 
+def clear_user_conversations(telegram_id):
+    if not db:
+        return
+    user_ref = db.collection("users").document(str(telegram_id))
+    for doc in user_ref.collection("conversations").stream():
+        doc.reference.delete()
+
+
 def hard_reset_user_data(telegram_id):
     if not db:
         return

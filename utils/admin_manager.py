@@ -9,9 +9,9 @@ ADMIN_NOTES = os.getenv("ADMIN_NOTES", "0")
 async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
-    # Only Root Admin (from .env) can add other admins
-    if str(user.id) != str(ADMIN_NOTES):
-        await update.message.reply_text("🔒 Only the Root Admin can add new admins.")
+    # Only existing admins can add other admins
+    if not firebase_db.is_admin(user.id):
+        await update.message.reply_text("🔒 Only admins can add new admins.")
         return
 
     if not context.args:
@@ -26,9 +26,9 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def remove_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
-    # Only Root Admin can remove admins
-    if str(user.id) != str(ADMIN_NOTES):
-        await update.message.reply_text("🔒 Only the Root Admin can remove admins.")
+    # Only existing admins can remove admins
+    if not firebase_db.is_admin(user.id):
+        await update.message.reply_text("🔒 Only admins can remove other admins.")
         return
 
     if not context.args:

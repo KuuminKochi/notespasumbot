@@ -32,6 +32,9 @@ API_KEY = os.getenv("API_KEY")
 NOTES_PASUM = int(os.getenv("NOTES_PASUM", 0))
 ADMIN_NOTES = int(os.getenv("ADMIN_NOTES", 0))
 
+if not API_KEY:
+    raise ValueError("API_KEY not found in environment variables")
+
 app = Application.builder().token(API_KEY).build()
 
 # --- AI Tutoring Handlers ---
@@ -50,6 +53,7 @@ app.add_handler(CommandHandler("jottednotes", jottednotes.jotted_notes))
 
 # New AI Management Commands
 app.add_handler(CommandHandler("hardreset", commands.hard_reset))
+app.add_handler(CommandHandler("reset", commands.soft_reset))
 app.add_handler(CommandHandler("memories", commands.show_memories))
 app.add_handler(CommandHandler("reprofile", commands.reprofile))
 app.add_handler(CommandHandler("announce", announcer.announce))
@@ -92,6 +96,9 @@ logger = logging.getLogger(__name__)
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log the error and send a telegram message to notify the developer."""
     logger.error(f"Exception while handling an update: {context.error}")
+
+    if not context.error:
+        return
 
     tb_list = traceback.format_exception(
         None, context.error, context.error.__traceback__

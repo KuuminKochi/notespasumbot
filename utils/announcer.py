@@ -11,12 +11,11 @@ ADMIN_NOTES = int(os.getenv("ADMIN_NOTES", 0))
 async def announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
-    # Security Check: Compare User ID to ADMIN_NOTES
-    # We compare strings to be safe against int/str mismatches
-    if not user or str(user.id) != str(ADMIN_NOTES):
+    # Security Check: Allow both root admin and additional admins
+    if not user or not firebase_db.is_admin(user.id):
         print(f"Unauthorized /announce attempt by {user.id} ({user.first_name})")
         await update.message.reply_text(
-            f"🔒 Nice try! This command is for the Admin only.\nYour ID: `{user.id}`\nConfigured Admin: `{ADMIN_NOTES}`"
+            f"🔒 Nice try! This command is for Admin only.\nYour ID: `{user.id}`"
         )
         return
 
@@ -120,48 +119,47 @@ async def announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 final_content += f"\n\n_Mimi: {personal_note}_"
 
             # C. Send based on type
-            # Use Markdown parsing carefully. If caption is too long, Telegram might error,
-            # but usually splitting is hard for captions. We assume reasonable length.
+            # Use HTML parsing consistently with the rest of the bot
 
             if media_type == "photo":
                 await context.bot.send_photo(
                     chat_id=uid,
                     photo=file_id,
                     caption=final_content,
-                    parse_mode="Markdown",
+                    parse_mode="HTML",
                 )
             elif media_type == "document":
                 await context.bot.send_document(
                     chat_id=uid,
                     document=file_id,
                     caption=final_content,
-                    parse_mode="Markdown",
+                    parse_mode="HTML",
                 )
             elif media_type == "video":
                 await context.bot.send_video(
                     chat_id=uid,
                     video=file_id,
                     caption=final_content,
-                    parse_mode="Markdown",
+                    parse_mode="HTML",
                 )
             elif media_type == "audio":
                 await context.bot.send_audio(
                     chat_id=uid,
                     audio=file_id,
                     caption=final_content,
-                    parse_mode="Markdown",
+                    parse_mode="HTML",
                 )
             elif media_type == "voice":
                 await context.bot.send_voice(
                     chat_id=uid,
                     voice=file_id,
                     caption=final_content,
-                    parse_mode="Markdown",
+                    parse_mode="HTML",
                 )
             else:
                 # Text only
                 await context.bot.send_message(
-                    chat_id=uid, text=final_content, parse_mode="Markdown"
+                    chat_id=uid, text=final_content, parse_mode="HTML"
                 )
 
             count += 1

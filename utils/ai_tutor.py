@@ -17,8 +17,8 @@ BASE_URL = "https://openrouter.ai/api/v1"
 KL_TZ = pytz.timezone("Asia/Kuala_Lumpur")
 
 # Model Selection
-CHAT_MODEL = "deepseek/deepseek-chat"
-FALLBACK_MODEL = "xiaomi/mimo-v2-flash"
+CHAT_MODEL = "xiaomi/mimo-v2-flash"
+FALLBACK_MODEL = "deepseek/deepseek-chat"
 REASONER_MODEL = "deepseek/deepseek-r1"
 
 # Prompt Paths
@@ -62,8 +62,10 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
         )
 
     persona_instruction = "\n\nCRITICAL: You MUST use HTML tags for formatting (<i>italics</i> for gestures, <b>bold</b> for emphasis, <code>code</code> for math/Latex). NEVER use Markdown (* or _)."
+
+    # Restructure: Bio -> Memories -> MANDATORY Grounding Rules
     system_content = (
-        f"{persona}\n\n{memory_block}\n\n---\n\n{global_rules}{persona_instruction}"
+        f"{global_rules}\n\n{persona}\n\n{memory_block}\n\n---\n\n{persona_instruction}"
     )
 
     history = firebase_db.get_recent_context(telegram_id, limit=5)
@@ -91,7 +93,7 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
     payload = {
         "model": target_model,
         "messages": messages,
-        "temperature": 0.5,
+        "temperature": 1.25,
         "stream": True,
     }
 
@@ -154,6 +156,34 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
 
         # Safety Net: Strip ALL URLs to prevent link spamming
         final_text = re.sub(r"http[s]?://\S+", "[Link Removed]", final_text)
+        final_text = re.sub(
+            r"\[.+\]\(.+\)", "[Link Removed]", final_text
+        )  # Markdown links
+        final_text = re.sub(r"www\.\S+", "[Link Removed]", final_text)  # www links
+        final_text = re.sub(
+            r"\.com\S*|\.org\S*|\.edu\S*|\.gov\S*|\.net\S*|\.io\S*",
+            "[Link Removed]",
+            final_text,
+        )  # Common TLDs
+        final_text = re.sub(
+            r"\s+\.\s+com\s*", " [Link Removed] ", final_text
+        )  # " . com" format
+        final_text = re.sub(
+            r"\s+\(dot\)\s+", " [Link Removed] ", final_text
+        )  # " (dot) " format
+        final_text = re.sub(
+            r"\s+\(\s*\.\s*\)\s+", " [Link Removed] ", final_text
+        )  # " ( . ) " format
+        final_text = re.sub(
+            r"(?i)gmail\.com|yahoo\.com|outlook\.com|hotmail\.com",
+            "[Email Domain Removed]",
+            final_text,
+        )  # Email domains
+        final_text = re.sub(
+            r"(?i)wikipedia\.org|khanacademy\.org|youtube\.com",
+            "[Link Removed]",
+            final_text,
+        )  # Common educational sites
 
         if not final_text:
             final_text = "I'm sorry, I couldn't generate a response."
