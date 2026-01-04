@@ -28,7 +28,7 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user or not update.message:
         return
 
-    # --- Supergroup Logic ---
+    # --- 1. Supergroup/Group Filtering ---
     if chat_type in ["group", "supergroup"]:
         # Only reply if mentioned or replying to bot
         is_reply_to_bot = (
@@ -40,27 +40,21 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not (is_reply_to_bot or is_mention):
             return
 
-    # --- Private Chat Logic ---
-    elif chat_type == "private":
-        pass  # Process everything
-    else:
+    # --- 2. Private Chat or Validated Group Message ---
+    elif chat_type != "private":
         return
 
     text = (update.message.text or update.message.caption or "").strip()
     asker_name = user.first_name or "Student"
     telegram_id = user.id
 
-    if not text and not (update.message.photo or update.message.document):
-        return
-
-    # 1. Firebase Profile Check & Update
+    # 1. Update User Profile in Background
     try:
         user_data = {
             "name": user.full_name,
             "username": user.username,
             "last_active": datetime.datetime.now(),
         }
-        # Run DB update in background to prevent blocking main loop
         loop = asyncio.get_running_loop()
         loop.run_in_executor(
             concurrency.get_pool(),
@@ -69,9 +63,18 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_data,
         )
     except Exception as e:
-        print(f"DB Error: {e}")
+        print(f"Async DB Error: {e}")
 
-    # 3. Handle Text (AI Tutor) - Only if NO photo found
+    # 2. Check for Media/Vision FIRST (Prioritize Vision over Text)
+    target_photo = update.message.photo
+    if not target_photo and update.message.reply_to_message:
+        target_photo = update.message.reply_to_message.photo
+
+    if target_photo:
+        await vision.process_image_question(update, context)
+        return
+
+    # 3. Handle Text (AI Tutor)
     if text:
         if len(text) < 2:
             return  # Ignore very short messages
@@ -81,10 +84,6 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Run AI in executor with HIGH CONCURRENCY POOL
-        # Loop already acquired above or get new one
-        if "loop" not in locals():
-            loop = asyncio.get_running_loop()
-
         response = await loop.run_in_executor(
             concurrency.get_pool(),
             ai_tutor.get_ai_response,
@@ -96,55 +95,18 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Send AI response (Reply to message to handle threads in supergroups)
         await update.message.reply_text(response)
 
-        # 4. Memory Extraction
+        # 4. Memory Extraction (Background)
         async def run_extraction_task():
-            await loop.run_in_executor(
-                concurrency.get_pool(),
-                memory_consolidator.extract_memories,
-                telegram_id,
-                text,
-                response,
-            )
-    except Exception as e:
-        print(f"DB Error: {e}")
-
-    # 2. Check for Media/Vision FIRST (Prioritize Vision over Text)
-    # Check current message photo OR replied-to message photo
-    target_photo = update.message.photo
-    if not target_photo and update.message.reply_to_message:
-        target_photo = update.message.reply_to_message.photo
-
-    if target_photo:
-        await vision.process_image_question(update, context)
-        return
-
-    # 3. Handle Text (AI Tutor) - Only if NO photo found
-    if text:
-        if len(text) < 2:
-            return  # Ignore very short messages
-
-        await context.bot.send_chat_action(
-            chat_id=update.effective_chat.id, action=ChatAction.TYPING
-        )
-
-        # Run AI in executor
-        # Loop already acquired above or get new one
-        if "loop" not in locals():
-            loop = asyncio.get_running_loop()
-
-        response = await loop.run_in_executor(
-            None, ai_tutor.get_ai_response, telegram_id, text, asker_name
-        )
-
-        # Send AI response (Reply to message to handle threads in supergroups)
-        await update.message.reply_text(response)
-
-        # 4. Memory Extraction
-        async def run_extraction_task():
-            await loop.run_in_executor(
-                None, memory_consolidator.extract_memories, telegram_id, text, response
-            )
+            try:
+                await loop.run_in_executor(
+                    concurrency.get_pool(),
+                    memory_consolidator.extract_memories,
+                    telegram_id,
+                    text,
+                    response,
+                )
+            except Exception as e:
+                print(f"Memory extraction failed: {e}")
 
         asyncio.create_task(run_extraction_task())
-
         return
