@@ -3,6 +3,7 @@ import requests
 import base64
 import json
 import re
+import random
 from telegram import Update
 from telegram.ext import ContextTypes
 import asyncio
@@ -12,15 +13,28 @@ from . import ai_tutor
 XAI_API_KEY = os.getenv("XAI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
+SPLASH_TEXTS = [
+    "Mimi is sharpening her pencils...",
+    "Checking the library archives...",
+    "Mimi is adjusting her hibiscus flower...",
+    "Consulting the PASUM scrolls...",
+    "Mimi is having a quick tea break while thinking...",
+    "Optimizing brain cells...",
+    "Scanning the cosmic background radiation...",
+    "Mimi is flipping through her notes...",
+    "Analyzing the molecular structure of this query...",
+    "Mimi is doing some quick mental math...",
+]
+
 
 async def process_image_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Analyzes images with Grok 4.1 Fast and solves with Reasoner or Chat (Streaming).
+    Analyzes images with Nemotron (with timeout) and solves with Reasoner or Chat (Streaming).
     """
     if not update.message:
         return
 
-    status_msg = await update.message.reply_text("👀 Mimi is analyzing your image...")
+    status_msg = await update.message.reply_text(f"👀 {random.choice(SPLASH_TEXTS)}")
 
     try:
         # 1. Determine Photo Source
@@ -39,8 +53,8 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
         img_bytes = await photo_file.download_as_bytearray()
         base64_image = base64.b64encode(img_bytes).decode("utf-8")
 
-        # 2. Vision Analysis (Grok 4.1 Fast via OpenRouter)
-        await status_msg.edit_text("🧠 Processing visual data...")
+        # 2. Vision Analysis
+        await status_msg.edit_text(f"🧠 {random.choice(SPLASH_TEXTS)}")
 
         vision_prompt = """
         Describe this image exactly. If it is a math/science problem, transcribe all symbols and text.
@@ -48,11 +62,15 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
         Set is_complex to true if it requires deep reasoning or calculation.
         """
 
+        # Call vision with 25s timeout
         vision_raw = await asyncio.to_thread(
             call_vision_ai, base64_image, vision_prompt
         )
         if not vision_raw:
-            await status_msg.edit_text("❌ Failed to read image.")
+            await status_msg.edit_text(
+                "❌ Mimi got a bit distracted (Vision Timeout). Trying fallback..."
+            )
+            # Optional: Add fallback here if desired, or just exit.
             return
 
         # Parse Complexity
@@ -70,7 +88,7 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
 
         # 3. Decision
         action = "thinking" if is_complex else "analyzing"
-        await status_msg.edit_text(f"🤔 Mimi is {action}...")
+        await status_msg.edit_text(f"🤔 {random.choice(SPLASH_TEXTS)}")
 
         model_id = "deepseek/deepseek-r1" if is_complex else "deepseek/deepseek-chat"
         reasoning_prompt = (
@@ -96,41 +114,33 @@ def call_vision_ai(base64_img, prompt):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/KuuminKochi/notespasumbot",
-        "X-Title": "NotesPASUMBot",
     }
 
-    # Reverted to Grok 4.1 Fast (Primary) with Grok 2 Vision (Fallback)
-    # Using OpenRouter IDs
-    models_to_try = ["x-ai/grok-4-1-fast-non-reasoning", "x-ai/grok-2-vision-1212"]
+    # Nemotron Free with 30s timeout
+    payload = {
+        "model": "nvidia/nemotron-nano-12b-v2-vl:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"},
+                    },
+                ],
+            }
+        ],
+        "temperature": 0.1,
+    }
 
-    for model in models_to_try:
-        payload = {
-            "model": model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_img}"
-                            },
-                        },
-                    ],
-                }
-            ],
-            "temperature": 0.1,
-        }
-
-        try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=60)
-            if resp.status_code == 200:
-                res_json = resp.json()
-                if "choices" in res_json and len(res_json["choices"]) > 0:
-                    return res_json["choices"][0]["message"]["content"]
-        except:
-            continue
-
+    try:
+        # Added timeout to requests
+        resp = requests.post(url, headers=headers, json=payload, timeout=30)
+        if resp.status_code == 200:
+            return resp.json()["choices"][0]["message"]["content"]
+    except requests.exceptions.Timeout:
+        print("Vision AI Timed Out")
+    except Exception as e:
+        print(f"Vision Error: {e}")
     return None
