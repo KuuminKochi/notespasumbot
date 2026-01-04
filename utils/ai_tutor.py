@@ -61,9 +61,9 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
             [f"- {m.get('content')}" for m in memories]
         )
 
-    persona_instruction = "\n\nIMPORTANT: Maintain your personality as Mimi. Be friendly, Malaysian, academic but concise. ALWAYS use HTML tags for formatting (<i>italics</i>, <b>bold</b>, <code>code</code>)."
+    persona_instruction = "\n\nCRITICAL: You MUST use HTML tags for formatting (<i>italics</i> for gestures, <b>bold</b> for emphasis, <code>code</code> for math/Latex). NEVER use Markdown (* or _)."
     system_content = (
-        f"{global_rules}\n\n---\n\n{persona}{memory_block}{persona_instruction}"
+        f"{persona}\n\n{memory_block}\n\n---\n\n{global_rules}{persona_instruction}"
     )
 
     history = firebase_db.get_recent_context(telegram_id, limit=5)
