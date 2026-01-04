@@ -53,7 +53,11 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "username": user.username,
             "last_active": datetime.datetime.now(),
         }
-        firebase_db.create_or_update_user(telegram_id, user_data)
+        # Run DB update in background to prevent blocking main loop
+        loop = asyncio.get_running_loop()
+        loop.run_in_executor(
+            None, firebase_db.create_or_update_user, telegram_id, user_data
+        )
     except Exception as e:
         print(f"DB Error: {e}")
 
@@ -67,7 +71,10 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Run AI in executor
-        loop = asyncio.get_running_loop()
+        # Loop already acquired above or get new one
+        if "loop" not in locals():
+            loop = asyncio.get_running_loop()
+
         response = await loop.run_in_executor(
             None, ai_tutor.get_ai_response, telegram_id, text, asker_name
         )
