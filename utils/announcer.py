@@ -11,10 +11,12 @@ ADMIN_NOTES = int(os.getenv("ADMIN_NOTES", 0))
 async def announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
-    # Security Check
-    if not user or update.effective_chat.id != ADMIN_NOTES:
+    # Security Check: Compare User ID to ADMIN_NOTES
+    # We compare strings to be safe against int/str mismatches
+    if not user or str(user.id) != str(ADMIN_NOTES):
+        print(f"Unauthorized /announce attempt by {user.id} ({user.first_name})")
         await update.message.reply_text(
-            "🔒 Nice try! This command is for the Admin only."
+            f"🔒 Nice try! This command is for the Admin only.\nYour ID: `{user.id}`\nConfigured Admin: `{ADMIN_NOTES}`"
         )
         return
 
