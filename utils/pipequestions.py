@@ -94,7 +94,12 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 4. Handle Media (Vision or File)
-    if update.message.photo:
+    # Check current message photo OR replied-to message photo
+    target_photo = update.message.photo
+    if not target_photo and update.message.reply_to_message:
+        target_photo = update.message.reply_to_message.photo
+
+    if target_photo:
         await vision.process_image_question(update, context)
         return
 

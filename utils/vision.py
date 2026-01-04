@@ -27,11 +27,11 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
         img_bytes = await photo_file.download_as_bytearray()
         base64_image = base64.b64encode(img_bytes).decode("utf-8")
 
-        # 2. Vision (Grok)
+        # 2. Vision (Opaque)
         await context.bot.edit_message_text(
             chat_id=update.effective_chat.id,
             message_id=status_msg.message_id,
-            text="🧠 Processing visual data (Grok Vision)...",
+            text="🧠 Processing visual data...",
         )
 
         vision_prompt = "Describe this image in detail. If it's a math/science problem, transcribe it exactly. If it's general, describe what's happening."
@@ -51,11 +51,11 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
 
         extracted_text = vision_response
 
-        # 3. Reasoning (DeepSeek)
+        # 3. Reasoning (Opaque)
         await context.bot.edit_message_text(
             chat_id=update.effective_chat.id,
             message_id=status_msg.message_id,
-            text="🤔 Mimi is thinking (DeepSeek Reasoner)...",
+            text="🤔 Mimi is thinking...",
         )
 
         reasoning_prompt = f"The user uploaded an image. Here is the transcription/description:\n\n{extracted_text}\n\nSolve this problem or answer the user's implicit question step-by-step."
