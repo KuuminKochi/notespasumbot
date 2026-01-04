@@ -51,22 +51,15 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
     persona = persona.replace("{{current_date}}", now.strftime("%Y-%m-%d"))
     persona = persona.replace("{{current_time}}", now.strftime("%H:%M"))
 
-    # 3. Get Memories
+    # 3. Get Memories (USER ONLY - Mimi reflections are deprecated)
     user_memories = firebase_db.get_user_memories(
         telegram_id, category="User", limit=15
-    )
-    mimi_memories = firebase_db.get_user_memories(
-        telegram_id, category="Mimi", limit=10
     )
 
     memory_block = ""
     if user_memories:
         memory_block += f"\n\n**What I know about {user_name}:**\n" + "\n".join(
             [f"- {m.get('content')}" for m in user_memories]
-        )
-    if mimi_memories:
-        memory_block += f"\n\n**Mimi's Self-Reflections:**\n" + "\n".join(
-            [f"- {m.get('content')}" for m in mimi_memories]
         )
 
     # 4. Construct System Prompt
@@ -105,7 +98,7 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
     payload = {
         "model": CHAT_MODEL,
         "messages": messages,
-        "temperature": 0.7,
+        "temperature": 0.5,
         "max_tokens": 1200,
     }
 
@@ -114,10 +107,14 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
             f"{BASE_URL}/chat/completions", headers=headers, json=payload, timeout=45
         )
         if response.status_code == 200:
-            ai_text = response.json()["choices"][0]["message"]["content"]
-            ai_text = re.sub(r"^(\[\d{2}:\d{2}\]\s*)+", "", ai_text).strip()
-            firebase_db.log_conversation(telegram_id, "assistant", ai_text)
-            return ai_text
+            res_json = response.json()
+            if "choices" in res_json:
+                ai_text = res_json["choices"][0]["message"]["content"]
+                ai_text = re.sub(r"^(\[\d{2}:\d{2}\]\s*)+", "", ai_text).strip()
+                firebase_db.log_conversation(telegram_id, "assistant", ai_text)
+                return ai_text
+            else:
+                return f"AI Error: Received invalid response from provider: {res_json}"
         return f"Error: {response.status_code} - {response.text}"
     except Exception as e:
         return f"Connection Error: {e}"
@@ -132,6 +129,8 @@ def generate_announcement_comment(announcement_text, user_memories):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/KuuminKochi/notespasumbot",
+        "X-Title": "NotesPASUMBot",
     }
     payload = {
         "model": CHAT_MODEL,
@@ -144,7 +143,9 @@ def generate_announcement_comment(announcement_text, user_memories):
             f"{BASE_URL}/chat/completions", headers=headers, json=payload, timeout=15
         )
         if resp.status_code == 200:
-            return resp.json()["choices"][0]["message"]["content"].strip()
+            res_json = resp.json()
+            if "choices" in res_json:
+                return res_json["choices"][0]["message"]["content"].strip()
     except:
         pass
     return ""
