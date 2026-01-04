@@ -1,6 +1,5 @@
 from telegram import Update
 from telegram.ext import (
-    Application,
     CommandHandler,
     MessageHandler,
     filters,
@@ -19,7 +18,7 @@ CHAT_MODEL = os.getenv("CHAT_MODEL", "xiaomi/mimo-v2-flash")
 
 
 async def track_active(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Track users in the group (Legacy support)."""
+    """Track users in group (Legacy support)."""
     chat = update.effective_chat
     user = update.effective_user
     NOTES_PASUM = int(os.getenv("NOTES_PASUM", 0))
@@ -75,7 +74,7 @@ async def pasum_match(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     prompt = f"""
-As Mimi, the AI Tutor, calculate the 'Study Chemistry' between a User and 5 potential study partners.
+As Mimi, AI Tutor, calculate "Study Chemistry" between a User and 5 potential study partners.
 User Profile: "{my_profile_text}"
 
 Candidates:
@@ -94,9 +93,12 @@ Output JSON Format:
 }}
 """
 
-    # Check API key
+    # Check if API key is set
     if not OPENROUTER_API_KEY:
-        await update.message.reply_text("⚠️ OpenRouter API key not configured!")
+        await update.message.reply_text(
+            "⚠️ OpenRouter API key not configured! Check .env file."
+        )
+        print(f"ERROR: OPENROUTER_API_KEY not set in pasummatch.py")
         return
 
     headers = {
@@ -126,9 +128,17 @@ Output JSON Format:
         )
 
         if response.status_code == 200:
-            results = json.loads(
-                response.json()["choices"][0]["message"]["content"]
-            ).get("matches", [])
+            try:
+                results = json.loads(
+                    response.json()["choices"][0]["message"]["content"]
+                ).get("matches", [])
+            except (json.JSONDecodeError, KeyError) as e:
+                print(f"ERROR: JSON decode error in pasummatch: {e}")
+                print(f"Response content: {response.text[:500]}")
+                await update.message.reply_text(
+                    "⚠️ Failed to parse AI response. Try again!"
+                )
+                return
 
             text = f"💘 **AI-Powered PASUM Matches for {user.first_name}** 💘\n\n"
             for m in results:
@@ -141,12 +151,14 @@ Output JSON Format:
             text += "✨ <i>Matches are calculated based on your unique student profiles.</i>"
             await update.message.reply_text(text, parse_mode="HTML")
         else:
+            print(f"ERROR: API returned status {response.status_code}")
+            print(f"Response: {response.text[:500]}")
             await update.message.reply_text(
-                "Mimi's analytical engine hit a snag! Let's try again in a bit."
+                f"⚠️ API Error (status {response.status_code}). Try again later!"
             )
+            return
 
     except Exception as e:
-        print(f"Match error: {e}")
-        await update.message.reply_text(
-            "Connection to the matching engine failed. Please try later!"
-        )
+        print(f"ERROR: Unexpected error in pasummatch: {e}")
+        print(f"Traceback: {type(e).__name__}: {e}")
+        await update.message.reply_text(f"⚠️ Error: {str(e)}. Please try later!")
