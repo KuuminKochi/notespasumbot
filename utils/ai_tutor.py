@@ -4,12 +4,14 @@ import json
 from . import firebase_db
 from datetime import datetime
 from dotenv import load_dotenv
+import pytz
 
 load_dotenv()
 
 # Configuration
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 BASE_URL = "https://api.deepseek.com/v1"
+KL_TZ = pytz.timezone("Asia/Kuala_Lumpur")
 
 # Prompt Paths
 PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
@@ -40,7 +42,7 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
     persona = load_file(PERSONA_PROMPT_FILE)
 
     # 2. Dynamic Template Replacement
-    now = datetime.now()
+    now = datetime.now(KL_TZ)
     persona = persona.replace("{{user}}", user_name)
     persona = persona.replace("{{current_date}}", now.strftime("%Y-%m-%d"))
     persona = persona.replace("{{current_time}}", now.strftime("%H:%M"))
@@ -112,10 +114,11 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
     # If it is, we don't append it again. If it's missing (DB lag), we append it.
     # We compare original content, not timestamped content for deduplication safety
     if not history or history[-1]["content"] != user_message:
+        now_kl = datetime.now(KL_TZ)
         messages.append(
             {
                 "role": "user",
-                "content": f"[{datetime.now().strftime('%H:%M')}] {user_message}",
+                "content": f"[{now_kl.strftime('%H:%M')}] {user_message}",
             }
         )
 
