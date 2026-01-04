@@ -1,9 +1,10 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
-from utils import firebase_db, ai_tutor, concurrency
+from utils import firebase_db, ai_tutor, concurrency, vision
 import asyncio
 import os
+import base64
 
 ADMIN_NOTES = int(os.getenv("ADMIN_NOTES", 0))
 
@@ -96,14 +97,37 @@ async def announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # A. Generate Personal Note (Only if we have text/caption context)
             personal_note = ""
             # Don't try to personalize if text is super short or non-existent
-            if len(announcement_text) > 5:
+            if len(announcement_text) > 5 or media_type:
                 memories = firebase_db.get_user_memories(uid, limit=5)
                 if memories:
+                    # If there's an image, analyze it first
+                    image_analysis = ""
+                    if media_type == "photo" and file_id:
+                        try:
+                            photo_file = await context.bot.get_file(file_id)
+                            img_bytes = await photo_file.download_as_bytearray()
+                            base64_image = base64.b64encode(img_bytes).decode("utf-8")
+                            vision_prompt = "Describe this image in 1-2 sentences."
+                            image_analysis = await loop.run_in_executor(
+                                concurrency.get_pool(),
+                                vision.call_vision_ai,
+                                base64_image,
+                                vision_prompt,
+                            )
+                            if image_analysis:
+                                announcement_context = f"Image shows: {image_analysis}. {announcement_text}"
+                            else:
+                                announcement_context = announcement_text
+                        except:
+                            announcement_context = announcement_text
+                    else:
+                        announcement_context = announcement_text
+
                     # Run AI in executor to prevent blocking
                     personal_note = await loop.run_in_executor(
                         concurrency.get_pool(),
                         ai_tutor.generate_announcement_comment,
-                        announcement_text,
+                        announcement_context,
                         memories,
                     )
 
@@ -116,7 +140,7 @@ async def announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # Append Mimi's note
             if personal_note:
-                final_content += f"\n\n_Mimi: {personal_note}_"
+                final_content += f"\n\n<i>Mimi: {personal_note}</i>"
 
             # C. Send based on type
             # Use HTML parsing consistently with the rest of the bot
