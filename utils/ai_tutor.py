@@ -82,6 +82,20 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
     except Exception as e:
         print(f"Failed to log user message: {e}")
 
+    # 5. Get History (Conversational Context)
+    history = firebase_db.get_recent_context(telegram_id, limit=8)
+
+    # 6. Build Messages & DEDUPLICATE (Fix for "Amnesia"/Race Condition)
+    messages = [{"role": "system", "content": system_content}]
+
+    for msg in history:
+        messages.append({"role": msg["role"], "content": msg["content"]})
+
+    # Check if the last message in history is the same as current user_message
+    # If it is, we don't append it again. If it's missing (DB lag), we append it.
+    if not messages or messages[-1]["content"] != user_message:
+        messages.append({"role": "user", "content": user_message})
+
     # 8. API Call
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
@@ -113,3 +127,46 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
             return f"Error from AI: {response.status_code} - {response.text}"
     except Exception as e:
         return f"Connection Error: {e}"
+
+
+def generate_announcement_comment(announcement_text, user_memories):
+    """
+    Generates a short, personalized PS for an announcement.
+    """
+    if not DEEPSEEK_API_KEY:
+        return ""
+
+    memories_text = "\n".join([f"- {m.get('content')}" for m in user_memories])
+
+    prompt = f"""
+    Context: I am sending a broadcast announcement to a student.
+    Announcement: "{announcement_text}"
+    
+    Student Memories:
+    {memories_text}
+    
+    Task: Write a very short (1 sentence), friendly, witty comment that connects the announcement to the student's specific memories/goals. 
+    If no relevant memories exist, return nothing (empty string).
+    Do not repeat the announcement. Just the personal comment.
+    """
+
+    headers = {
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7,
+        "max_tokens": 60,
+    }
+
+    try:
+        response = requests.post(
+            f"{BASE_URL}/chat/completions", headers=headers, json=payload, timeout=10
+        )
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"].strip()
+    except:
+        pass
+    return ""

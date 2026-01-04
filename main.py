@@ -21,6 +21,7 @@ from utils import (
     pasumpals,
     jottednotes,
     commands,
+    announcer,
 )
 import os
 
@@ -51,6 +52,7 @@ app.add_handler(CommandHandler("jottednotes", jottednotes.jotted_notes))
 app.add_handler(CommandHandler("reset", commands.reset_context))
 app.add_handler(CommandHandler("memories", commands.show_memories))
 app.add_handler(CommandHandler("reprofile", commands.reprofile))
+app.add_handler(CommandHandler("announce", announcer.announce))
 
 # --- Matching & Admin Handlers ---
 app.add_handler(

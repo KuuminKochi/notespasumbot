@@ -115,6 +115,27 @@ def get_user_memories(telegram_id, category=None, limit=20):
     return memories
 
 
+def save_announcement(text, admin_id):
+    """
+    Logs an announcement made by the admin.
+    """
+    if not db:
+        return
+    db.collection("announcements").add(
+        {"text": text, "admin_id": str(admin_id), "timestamp": datetime.datetime.now()}
+    )
+
+
+def get_all_user_ids():
+    """
+    Efficiently retrieve just IDs for broadcasting.
+    """
+    if not db:
+        return []
+    docs = db.collection("users").stream()
+    return [doc.id for doc in docs]
+
+
 def get_all_user_profiles(limit=50):
     """
     Retrieves all user profiles for matching.
