@@ -57,7 +57,7 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
     memories = firebase_db.get_user_memories(telegram_id, category="User", limit=8)
     memory_block = ""
     if memories:
-        memory_block = f"\n\n**Context about {user_name}:**\n" + "\n".join(
+        memory_block = f"\n\n**What {user_name} has told Mimi:**\n" + "\n".join(
             [f"- {m.get('content')}" for m in memories]
         )
 
