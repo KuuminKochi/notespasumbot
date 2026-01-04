@@ -51,9 +51,9 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
 
         vision_prompt = "Describe this image in detail. If it's a math/science problem, transcribe it exactly. If it's general, describe what's happening."
 
-        # xAI API Call (OpenAI-compatible)
+        # Vision API Call
         vision_response = await asyncio.to_thread(
-            call_grok_vision, base64_image, vision_prompt
+            call_vision_ai, base64_image, vision_prompt
         )
 
         if not vision_response:
@@ -92,18 +92,24 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
         )
 
 
-def call_grok_vision(base64_img, prompt):
-    if not XAI_API_KEY:
-        return "Error: XAI_API_KEY missing."
+def call_vision_ai(base64_img, prompt):
+    """
+    Uses OpenRouter to analyze images.
+    Default: nvidia/nemotron-nano-12b-v2-vl:free
+    """
+    if not OPENROUTER_API_KEY:
+        return "Error: OPENROUTER_API_KEY missing."
 
-    url = "https://api.x.ai/v1/chat/completions"
+    url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
-        "Authorization": f"Bearer {XAI_API_KEY}",
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/KuuminKochi/notespasumbot",
+        "X-Title": "NotesPASUMBot",
     }
 
-    # Try the requested fast model first, fallback to stable
-    models_to_try = ["grok-4-1-fast-non-reasoning", "grok-2-vision-1212"]
+    # Use Nemotron as default, with xAI as fallback
+    models_to_try = ["nvidia/nemotron-nano-12b-v2-vl:free", "x-ai/grok-2-vision-1212"]
 
     for model in models_to_try:
         payload = {
@@ -122,14 +128,15 @@ def call_grok_vision(base64_img, prompt):
                     ],
                 }
             ],
-            "stream": False,
-            "temperature": 0.01,
+            "temperature": 0.1,
         }
 
         try:
             resp = requests.post(url, headers=headers, json=payload, timeout=60)
             if resp.status_code == 200:
-                return resp.json()["choices"][0]["message"]["content"]
+                res_json = resp.json()
+                if "choices" in res_json and len(res_json["choices"]) > 0:
+                    return res_json["choices"][0]["message"]["content"]
         except:
             continue
 
@@ -159,7 +166,9 @@ def call_deepseek_reasoner(prompt):
         try:
             resp = requests.post(url, headers=headers, json=payload, timeout=120)
             if resp.status_code == 200:
-                return resp.json()["choices"][0]["message"]["content"]
+                res_json = resp.json()
+                if "choices" in res_json and len(res_json["choices"]) > 0:
+                    return res_json["choices"][0]["message"]["content"]
         except:
             continue
 
