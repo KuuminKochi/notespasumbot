@@ -93,7 +93,7 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
     payload = {
         "model": target_model,
         "messages": messages,
-        "temperature": 1.25,
+        "temperature": 0.5,
         "stream": True,
     }
 
