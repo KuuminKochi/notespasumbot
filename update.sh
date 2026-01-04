@@ -12,7 +12,13 @@ ssh -i "$SSH_KEY" "$SERVER" "
   cd '$REPO_DIR'
   git fetch origin
   git reset --hard origin/main
-  pip3 install -r requirements-minimal.txt
+  
+  # Ensure venv exists
+  if [ ! -d 'venv' ]; then
+    python3 -m venv venv
+  fi
+  
+  ./venv/bin/pip install -r requirements-minimal.txt
   systemctl restart '$SERVICE_NAME'
   systemctl status '$SERVICE_NAME' --no-pager
 "

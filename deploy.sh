@@ -51,13 +51,20 @@ else
   "
 fi
 
-# Install dependencies
-echo "📦 Installing Python dependencies (minimal version)..."
+# Install dependencies in virtual environment
+echo "📦 Setting up Python Virtual Environment..."
 ssh -i "$SSH_KEY" "$SERVER" "
   cd '$REPO_DIR'
-  which python3 || apt-get install -y python3 python3-pip
-  pip3 install --upgrade pip
-  pip3 install -r requirements-minimal.txt || echo '⚠️  Some packages may have failed to install'
+  which python3 || apt-get install -y python3 python3-pip python3-venv
+  
+  if [ ! -d 'venv' ]; then
+    echo "Creating venv..."
+    python3 -m venv venv
+  fi
+  
+  echo "Installing dependencies..."
+  ./venv/bin/pip install --upgrade pip
+  ./venv/bin/pip install -r requirements-minimal.txt
 "
 
 # Create systemd service
