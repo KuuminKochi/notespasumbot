@@ -4,17 +4,22 @@ from google.cloud import firestore
 import os
 import datetime
 
-# Initialize Firebase
+# Initialize Firebase Admin (for other features if needed)
 cred_path = os.getenv("FIREBASE_CREDENTIALS", "service-account.json")
-
 if not firebase_admin._apps:
     if os.path.exists(cred_path):
-        cred = credentials.Certificate(cred_path)
-        firebase_admin.initialize_app(cred)
+        firebase_admin.initialize_app(credentials.Certificate(cred_path))
     else:
-        pass
+        try:
+            firebase_admin.initialize_app()
+        except:
+            pass
 
-db = firestore.Client() if firebase_admin._apps else None
+# Initialize Firestore Client explicitly with credentials to avoid ADC errors
+if os.path.exists(cred_path):
+    db = firestore.Client.from_service_account_json(cred_path)
+else:
+    db = firestore.Client()
 
 
 def get_user_profile(telegram_id):
@@ -140,7 +145,7 @@ def remove_admin(user_id):
     if not db:
         return
     db.collection("settings").document("admins").update(
-        {str(user_id): firestore.FieldValue.delete()}
+        {str(user_id): firestore.DELETE_FIELD}
     )
 
 
@@ -174,8 +179,8 @@ def hard_reset_user_data(telegram_id):
     # Clear Profile
     user_ref.update(
         {
-            "psych_profile": firestore.FieldValue.delete(),
-            "profile_tags": firestore.FieldValue.delete(),
-            "last_profile_update": firestore.FieldValue.delete(),
+            "psych_profile": firestore.DELETE_FIELD,
+            "profile_tags": firestore.DELETE_FIELD,
+            "last_profile_update": firestore.DELETE_FIELD,
         }
     )

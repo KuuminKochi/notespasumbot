@@ -17,6 +17,9 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
     """
     Analyzes images with Nemotron and solves with Reasoner or Chat (Streaming).
     """
+    if not update.message:
+        return
+
     status_msg = await update.message.reply_text("👀 Mimi is analyzing your image...")
 
     try:
@@ -80,7 +83,10 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
         )
 
     except Exception as e:
-        await status_msg.edit_text(f"⚠️ Error: {str(e)}")
+        try:
+            await status_msg.edit_text(f"⚠️ Error: {str(e)}")
+        except:
+            pass
 
 
 def call_vision_ai(base64_img, prompt):
