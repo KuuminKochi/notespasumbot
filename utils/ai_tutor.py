@@ -151,6 +151,10 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
                         pass
 
         final_text = re.sub(r"^(\[\d{2}:\d{2}\]\s*)+", "", full_text).strip()
+
+        # Safety Net: Strip ALL URLs to prevent link spamming
+        final_text = re.sub(r"http[s]?://\S+", "[Link Removed]", final_text)
+
         if not final_text:
             final_text = "I'm sorry, I couldn't generate a response."
 
