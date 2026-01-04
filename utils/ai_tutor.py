@@ -5,6 +5,7 @@ from . import firebase_db
 from datetime import datetime
 from dotenv import load_dotenv
 import pytz
+import re
 
 load_dotenv()
 
@@ -115,10 +116,12 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
     # We compare original content, not timestamped content for deduplication safety
     if not history or history[-1]["content"] != user_message:
         now_kl = datetime.now(KL_TZ)
+        time_tag = now_kl.strftime("%H:%M")
+        print(f"DEBUG: Appending user message with time [{time_tag}]")
         messages.append(
             {
                 "role": "user",
-                "content": f"[{now_kl.strftime('%H:%M')}] {user_message}",
+                "content": f"[{time_tag}] {user_message}",
             }
         )
 
@@ -141,6 +144,10 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
         )
         if response.status_code == 200:
             ai_text = response.json()["choices"][0]["message"]["content"]
+
+            # Clean up timestamps from AI response if it hallucinates them
+            # Matches [12:30] or [12:30] [12:30] at start
+            ai_text = re.sub(r"^(\[\d{2}:\d{2}\]\s*)+", "", ai_text).strip()
 
             # Log assistant response
             try:
