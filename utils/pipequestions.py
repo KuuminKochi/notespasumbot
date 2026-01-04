@@ -74,7 +74,7 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await vision.process_image_question(update, context)
         return
 
-    # 3. Handle Text (AI Tutor)
+    # 3. Handle Text (AI Tutor with Streaming)
     if text:
         if len(text) < 2:
             return  # Ignore very short messages
@@ -83,30 +83,9 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_chat.id, action=ChatAction.TYPING
         )
 
-        # Run AI in executor with HIGH CONCURRENCY POOL
-        response = await loop.run_in_executor(
-            concurrency.get_pool(),
-            ai_tutor.get_ai_response,
-            telegram_id,
-            text,
-            asker_name,
-        )
+        # Create placeholder for streaming
+        status_msg = await update.message.reply_text("💭 Thinking...")
 
-        # Send AI response (Reply to message to handle threads in supergroups)
-        await update.message.reply_text(response)
-
-        # 4. Memory Extraction (Background)
-        async def run_extraction_task():
-            try:
-                await loop.run_in_executor(
-                    concurrency.get_pool(),
-                    memory_consolidator.extract_memories,
-                    telegram_id,
-                    text,
-                    response,
-                )
-            except Exception as e:
-                print(f"Memory extraction failed: {e}")
-
-        asyncio.create_task(run_extraction_task())
+        # Call the streaming version
+        await ai_tutor.stream_ai_response(update, context, status_msg, text)
         return

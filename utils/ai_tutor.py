@@ -3,9 +3,11 @@ import requests
 import json
 import pytz
 import re
+import asyncio
+import time
 from datetime import datetime
 from dotenv import load_dotenv
-from . import firebase_db
+from . import firebase_db, concurrency
 
 load_dotenv()
 
@@ -14,7 +16,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 BASE_URL = "https://openrouter.ai/api/v1"
 KL_TZ = pytz.timezone("Asia/Kuala_Lumpur")
 
-# Model Selection (OpenRouter)
+# Model Selection
 CHAT_MODEL = "deepseek/deepseek-chat"
 FALLBACK_MODEL = "xiaomi/mimo-v2-flash"
 REASONER_MODEL = "deepseek/deepseek-r1"
@@ -30,51 +32,46 @@ def load_file(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 return f.read().strip()
-        except Exception as e:
-            print(f"Error reading {path}: {e}")
+        except:
+            pass
     return ""
 
 
-def get_ai_response(telegram_id, user_message, user_name="Student"):
+async def stream_ai_response(update, context, status_msg, user_message, model_id=None):
     """
-    Generates a response using OpenRouter (DeepSeek).
+    Streams AI response to Telegram.
+    Uses sliding window (limit 5) and selective memory (limit 8).
     """
-    if not OPENROUTER_API_KEY:
-        return "⚠️ Error: OpenRouter API Key not configured."
+    telegram_id = update.effective_user.id
+    user_name = update.effective_user.first_name or "Student"
 
-    # 1. Load Prompts
+    # 1. Setup Context
     global_rules = load_file(GLOBAL_PROMPT_FILE)
     persona = load_file(PERSONA_PROMPT_FILE)
-
-    # 2. Dynamic Template Replacement
     now = datetime.now(KL_TZ)
-    persona = persona.replace("{{user}}", user_name)
-    persona = persona.replace("{{current_date}}", now.strftime("%Y-%m-%d"))
-    persona = persona.replace("{{current_time}}", now.strftime("%H:%M"))
-
-    # 3. Get Memories (USER ONLY - Mimi reflections are deprecated)
-    user_memories = firebase_db.get_user_memories(
-        telegram_id, category="User", limit=15
+    persona = (
+        persona.replace("{{user}}", user_name)
+        .replace("{{current_date}}", now.strftime("%Y-%m-%d"))
+        .replace("{{current_time}}", now.strftime("%H:%M"))
     )
 
+    # Selective memory (limit 8)
+    memories = firebase_db.get_user_memories(telegram_id, category="User", limit=8)
     memory_block = ""
-    if user_memories:
-        memory_block += f"\n\n**What I know about {user_name}:**\n" + "\n".join(
-            [f"- {m.get('content')}" for m in user_memories]
+    if memories:
+        memory_block = f"\n\n**Context about {user_name}:**\n" + "\n".join(
+            [f"- {m.get('content')}" for m in memories]
         )
 
-    # 4. Construct System Prompt
-    system_content = f"{global_rules}\n\n---\n\n{persona}{memory_block}\n\nNote: Always prioritize well-being."
+    # Maintain personality in DeepSeek Reasoner
+    persona_instruction = "\n\nIMPORTANT: Maintain your personality as Mimi. Be friendly, Malaysian, academic but concise."
+    system_content = (
+        f"{global_rules}\n\n---\n\n{persona}{memory_block}{persona_instruction}"
+    )
 
-    # 5. Get History & Pre-log
-    try:
-        firebase_db.log_conversation(telegram_id, "user", user_message)
-    except:
-        pass
+    # Sliding window (limit 5)
+    history = firebase_db.get_recent_context(telegram_id, limit=5)
 
-    history = firebase_db.get_recent_context(telegram_id, limit=10)
-
-    # 6. Build Messages with Deduplication
     messages = [{"role": "system", "content": system_content}]
     for msg in history:
         content = msg["content"]
@@ -83,13 +80,12 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
             content = f"[{time_str}] {content}"
         messages.append({"role": msg["role"], "content": content})
 
-    # Ensure current message is at the end if not in history
-    if not history or history[-1]["content"] != user_message:
-        messages.append(
-            {"role": "user", "content": f"[{now.strftime('%H:%M')}] {user_message}"}
-        )
+    # Final User Message
+    messages.append(
+        {"role": "user", "content": f"[{now.strftime('%H:%M')}] {user_message}"}
+    )
 
-    # 7. API Call with Fallback
+    # 2. Call API with Streaming
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
@@ -97,75 +93,110 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
         "X-Title": "NotesPASUMBot",
     }
 
-    models_to_try = [CHAT_MODEL, FALLBACK_MODEL]
-    last_error = ""
+    # Use selected model or default chat
+    target_model = model_id or CHAT_MODEL
 
-    for model in models_to_try:
-        payload = {
-            "model": model,
-            "messages": messages,
-            "temperature": 0.5,
-            "max_tokens": 1200,
-        }
+    payload = {
+        "model": target_model,
+        "messages": messages,
+        "temperature": 0.5,
+        "stream": True,
+    }
 
-        try:
-            response = requests.post(
+    full_text = ""
+    last_edit_time = 0
+    update_interval = 1.5
+
+    try:
+        loop = asyncio.get_running_loop()
+        # Initial status edit
+        await status_msg.edit_text("💭 Mimi is thinking...")
+
+        response = await loop.run_in_executor(
+            concurrency.get_pool(),
+            lambda: requests.post(
                 f"{BASE_URL}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=45,
-            )
+                stream=True,
+                timeout=90,
+            ),
+        )
 
-            if response.status_code == 200:
-                res_json = response.json()
-                if "choices" in res_json and len(res_json["choices"]) > 0:
-                    ai_text = res_json["choices"][0]["message"]["content"]
-                    ai_text = re.sub(r"^(\[\d{2}:\d{2}\]\s*)+", "", ai_text).strip()
-                    firebase_db.log_conversation(telegram_id, "assistant", ai_text)
-                    return ai_text
-                else:
-                    last_error = f"AI Error ({model}): Invalid response format."
-                    continue
-            elif response.status_code in [402, 429, 502, 503, 504]:
-                # Credits exhausted, Rate limit, or Server Error - Try next model
-                last_error = f"Provider Error ({model}): {response.status_code}"
-                continue
-            else:
-                return f"Error: {response.status_code} - {response.text}"
+        if response.status_code != 200:
+            # Try fallback if primary fails (e.g. 402)
+            if target_model == CHAT_MODEL:
+                print(f"Fallback to {FALLBACK_MODEL}...")
+                return await stream_ai_response(
+                    update, context, status_msg, user_message, FALLBACK_MODEL
+                )
+            await status_msg.edit_text(f"⚠️ Error: {response.status_code}")
+            return
 
-        except Exception as e:
-            last_error = f"Connection Error ({model}): {e}"
-            continue
+        for line in response.iter_lines():
+            if line:
+                line_text = line.decode("utf-8")
+                if line_text.startswith("data: "):
+                    data_str = line_text[6:]
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data_str)
+                        content = chunk["choices"][0]["delta"].get("content", "")
+                        full_text += content
 
-    return f"⚠️ All AI models failed. Last error: {last_error}"
+                        # Throttle updates
+                        if time.time() - last_edit_time > update_interval:
+                            clean_text = re.sub(
+                                r"^(\[\d{2}:\d{2}\]\s*)+", "", full_text
+                            ).strip()
+                            if clean_text:
+                                try:
+                                    await status_msg.edit_text(clean_text + " ▌")
+                                    last_edit_time = time.time()
+                                except:
+                                    pass
+                    except:
+                        pass
+
+        # Final Cleanup
+        final_text = re.sub(r"^(\[\d{2}:\d{2}\]\s*)+", "", full_text).strip()
+        if not final_text:
+            final_text = "I'm sorry, I couldn't generate a response."
+
+        await status_msg.edit_text(final_text)
+
+        # Log to DB (Async)
+        firebase_db.log_conversation(telegram_id, "user", user_message)
+        firebase_db.log_conversation(telegram_id, "assistant", final_text)
+
+    except Exception as e:
+        await status_msg.edit_text(f"⚠️ Error: {str(e)}")
+
+
+def get_ai_response(telegram_id, user_message, user_name="Student"):
+    # This is now a dummy for backward compatibility or unused internal logic
+    return "Please use stream_ai_response instead."
 
 
 def generate_announcement_comment(announcement_text, user_memories):
     if not OPENROUTER_API_KEY:
         return ""
     memories_text = "\n".join([f"- {m.get('content')}" for m in user_memories])
-    prompt = f"Announcement: {announcement_text}\nMemories: {memories_text}\nWrite a 1-sentence witty personal comment."
-
+    prompt = f"Announcement: {announcement_text}\nMemories: {memories_text}\nWrite 1 short sentence."
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/KuuminKochi/notespasumbot",
-        "X-Title": "NotesPASUMBot",
     }
     payload = {
         "model": CHAT_MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 60,
     }
-
     try:
         resp = requests.post(
             f"{BASE_URL}/chat/completions", headers=headers, json=payload, timeout=15
         )
-        if resp.status_code == 200:
-            res_json = resp.json()
-            if "choices" in res_json:
-                return res_json["choices"][0]["message"]["content"].strip()
+        return resp.json()["choices"][0]["message"]["content"].strip()
     except:
-        pass
-    return ""
+        return ""
