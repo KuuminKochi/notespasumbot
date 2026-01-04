@@ -112,10 +112,10 @@ Output JSON Format:
         "model": CHAT_MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.5,
-        "response_format": {"type": "json_object"},
     }
 
     try:
+        print(f"DEBUG: Calling OpenRouter API with model: {CHAT_MODEL}")
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
             None,
@@ -127,36 +127,35 @@ Output JSON Format:
             ),
         )
 
-        if response.status_code == 200:
-            try:
-                results = json.loads(
-                    response.json()["choices"][0]["message"]["content"]
-                ).get("matches", [])
-            except (json.JSONDecodeError, KeyError) as e:
-                print(f"ERROR: JSON decode error in pasummatch: {e}")
-                print(f"Response content: {response.text[:500]}")
-                await update.message.reply_text(
-                    "⚠️ Failed to parse AI response. Try again!"
-                )
-                return
-
-            text = f"💘 **AI-Powered PASUM Matches for {user.first_name}** 💘\n\n"
-            for m in results:
-                score = m.get("score", 0)
-                emoji = "🔥" if score > 80 else "🤝" if score > 50 else "📚"
-                text += (
-                    f"{emoji} **{m.get('name')}** = {score}%\n_{m.get('comment')}_\n\n"
-                )
-
-            text += "✨ <i>Matches are calculated based on your unique student profiles.</i>"
-            await update.message.reply_text(text, parse_mode="HTML")
-        else:
+        print(f"DEBUG: API Response status: {response.status_code}")
+        if response.status_code != 200:
             print(f"ERROR: API returned status {response.status_code}")
             print(f"Response: {response.text[:500]}")
             await update.message.reply_text(
                 f"⚠️ API Error (status {response.status_code}). Try again later!"
             )
             return
+
+        results = json.loads(response.json()["choices"][0]["message"]["content"]).get(
+            "matches", []
+        )
+
+        text = f"💘 **AI-Powered PASUM Matches for {user.first_name}** 💘\n\n"
+        for m in results:
+            score = m.get("score", 0)
+            emoji = "🔥" if score > 80 else "🤝" if score > 50 else "📚"
+            text += f"{emoji} **{m.get('name')}** = {score}%\n_{m.get('comment')}_\n\n"
+
+        text += (
+            "✨ <i>Matches are calculated based on your unique student profiles.</i>"
+        )
+        await update.message.reply_text(text, parse_mode="HTML")
+
+    except json.JSONDecodeError as e:
+        print(f"ERROR: JSON decode error in pasummatch: {e}")
+        print(f"Response content: {response.text[:500]}")
+        await update.message.reply_text("⚠️ Failed to parse AI response. Try again!")
+        return
 
     except Exception as e:
         print(f"ERROR: Unexpected error in pasummatch: {e}")
