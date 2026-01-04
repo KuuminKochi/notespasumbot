@@ -18,7 +18,7 @@ ssh -i "$SSH_KEY" "$SERVER" "
     python3 -m venv venv
   fi
   
-  ./venv/bin/pip install -r requirements-minimal.txt
+  ./venv/bin/pip install -r requirements.txt
   systemctl restart '$SERVICE_NAME'
   systemctl status '$SERVICE_NAME' --no-pager
 "

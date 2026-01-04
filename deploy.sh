@@ -64,7 +64,7 @@ ssh -i "$SSH_KEY" "$SERVER" "
   
   echo "Installing dependencies..."
   ./venv/bin/pip install --upgrade pip
-  ./venv/bin/pip install -r requirements-minimal.txt
+  ./venv/bin/pip install -r requirements.txt
 "
 
 # Create systemd service
