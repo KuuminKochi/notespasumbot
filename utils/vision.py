@@ -22,8 +22,23 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
     status_msg = await update.message.reply_text("👀 Mimi is analyzing your image...")
 
     try:
-        # 1. Download Image
-        photo_file = await update.message.photo[-1].get_file()
+        # 1. Determine Photo Source
+        photo_obj = None
+        if update.message.photo:
+            photo_obj = update.message.photo[-1]
+        elif update.message.reply_to_message and update.message.reply_to_message.photo:
+            photo_obj = update.message.reply_to_message.photo[-1]
+
+        if not photo_obj:
+            await context.bot.edit_message_text(
+                chat_id=update.effective_chat.id,
+                message_id=status_msg.message_id,
+                text="❌ No image found to process.",
+            )
+            return
+
+        # Download Image
+        photo_file = await photo_obj.get_file()
         img_bytes = await photo_file.download_as_bytearray()
         base64_image = base64.b64encode(img_bytes).decode("utf-8")
 
