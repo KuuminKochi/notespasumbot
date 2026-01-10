@@ -117,11 +117,15 @@ async def stream_ai_response(update, context, status_msg, user_message):
     update_interval = 1.0
 
     try:
+        print(f"DEBUG: Calling OpenRouter API with model: {CHAT_MODEL}")
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
             None,
             lambda: requests.post(BASE_URL, headers=headers, json=payload, timeout=90),
         )
+
+        print(f"DEBUG: API Response status: {response.status_code}")
+        print(f"DEBUG: API Response body: {response.text[:500]}")
 
         if response.status_code != 200:
             await status_msg.edit_text(f"API Error: {response.status_code}")
@@ -129,11 +133,14 @@ async def stream_ai_response(update, context, status_msg, user_message):
 
         try:
             data = response.json()
+            print(f"DEBUG: Parsed JSON: {json.dumps(data)[:500]}")
             if "choices" in data and len(data["choices"]) > 0:
                 full_text = data["choices"][0]["message"].get("content", "")
             else:
                 full_text = ""
-        except json.JSONDecodeError:
+                print("DEBUG: No choices in response")
+        except json.JSONDecodeError as e:
+            print(f"DEBUG: JSON decode error: {e}")
             full_text = ""
 
         if full_text:
