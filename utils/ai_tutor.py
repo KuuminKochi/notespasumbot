@@ -142,44 +142,37 @@ async def stream_ai_response(update, context, status_msg, user_message):
         for line in response.iter_lines():
             if line:
                 line_str = line.decode("utf-8")
-                print(f"DEBUG: Raw line: {line_str[:100]}")
                 if line_str.startswith("data: "):
                     data = line_str[6:]
                     if data == "[DONE]":
-                        print("DEBUG: Stream done")
                         break
                     try:
                         chunk = json.loads(data)
-                        print(f"DEBUG: Chunk keys: {chunk.keys()}")
                         if "choices" in chunk and len(chunk["choices"]) > 0:
                             delta = chunk["choices"][0].get("delta", {})
-                            print(f"DEBUG: Delta: {delta}")
                             content = delta.get("content", "")
-                            print(f"DEBUG: Content: '{content}'")
                             if content:
                                 buffer += content
-                                print(f"DEBUG: Buffer: '{buffer[:50]}...'")
-                                if len(buffer) >= 30:
+                                if len(buffer) >= 80:
                                     final = clean_output(buffer)
                                     await status_msg.edit_text(
                                         final + "▌", parse_mode="HTML"
                                     )
                                     buffer = ""
-                    except json.JSONDecodeError as e:
-                        print(f"DEBUG: JSON decode error: {e}")
+                    except json.JSONDecodeError:
+                        pass
 
         if buffer:
             final = clean_output(buffer)
             await status_msg.edit_text(final, parse_mode="HTML")
-        elif full_text:
-            final = clean_output(full_text)
-            await status_msg.edit_text(final, parse_mode="HTML")
+            print(f"DEBUG: Final response: {final[:100]}...")
         else:
             await status_msg.edit_text(
                 "I couldn't generate a response. Please try again."
             )
             return
 
+        print(f"DEBUG: Logging conversation for user {telegram_id}")
         prune_conversation(telegram_id)
         firebase_db.log_conversation(telegram_id, "user", user_message)
         firebase_db.log_conversation(telegram_id, "assistant", final)
