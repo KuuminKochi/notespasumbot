@@ -118,8 +118,10 @@ async def stream_ai_response(update, context, status_msg, user_message):
         "stream": True,
     }
 
-    full_text = ""
     buffer = ""
+    revealed_count = 0
+    CHARS_PER_EDIT = 2
+    EDIT_DELAY = 0.05
 
     try:
         print(f"DEBUG: Calling OpenRouter API (streaming) with model: {CHAT_MODEL}")
@@ -153,17 +155,18 @@ async def stream_ai_response(update, context, status_msg, user_message):
                             content = delta.get("content", "")
                             if content:
                                 buffer += content
-                                if len(buffer) >= 80:
-                                    final = clean_output(buffer)
-                                    await status_msg.edit_text(
-                                        final + "▌", parse_mode="HTML"
-                                    )
-                                    buffer = ""
+                                revealed_count += len(content)
+                                visible_text = clean_output(buffer[:revealed_count])
+                                await status_msg.edit_text(
+                                    visible_text + "▌", parse_mode="HTML"
+                                )
+                                await asyncio.sleep(EDIT_DELAY)
                     except json.JSONDecodeError:
                         pass
 
-        if buffer:
-            final = clean_output(buffer)
+        final = clean_output(buffer)
+
+        if final:
             await status_msg.edit_text(final, parse_mode="HTML")
             print(f"DEBUG: Final response: {final[:100]}...")
         else:
