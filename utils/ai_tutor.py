@@ -13,8 +13,9 @@ load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 BASE_URL = "https://openrouter.ai/api/v1"
-KL_TZ = pytz.timezone("Asia/Kuala_Lumpur")
+CHAT_ENDPOINT = f"{BASE_URL}/chat/completions"
 CHAT_MODEL = "xiaomi/mimo-v2-flash:free"
+KL_TZ = pytz.timezone("Asia/Kuala_Lumpur")
 
 PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
 GLOBAL_PROMPT_FILE = os.path.join(PROMPTS_DIR, "global_grounding.md")
@@ -121,7 +122,9 @@ async def stream_ai_response(update, context, status_msg, user_message):
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
             None,
-            lambda: requests.post(BASE_URL, headers=headers, json=payload, timeout=90),
+            lambda: requests.post(
+                CHAT_ENDPOINT, headers=headers, json=payload, timeout=90
+            ),
         )
 
         print(f"DEBUG: API Response status: {response.status_code}")
