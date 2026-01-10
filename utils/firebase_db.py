@@ -66,46 +66,20 @@ def get_recent_context(telegram_id, limit=5):
     return messages[::-1]
 
 
+# Memory functions are DISABLED for refactoring
+# These will be reimplemented later
+
+
 def save_memory(telegram_id, content, category="User"):
-    if not db:
-        return
-    user_ref = db.collection("users").document(str(telegram_id))
-    user_ref.collection("memories").add(
-        {
-            "content": content,
-            "category": category,
-            "timestamp": datetime.datetime.now(),
-            "type": "auto_summary",
-        }
-    )
+    pass
 
 
 def get_user_memories(telegram_id, category=None, limit=8):
-    if not db:
-        return []
-    user_ref = db.collection("users").document(str(telegram_id))
-    query = user_ref.collection("memories").order_by(
-        "timestamp", direction=firestore.Query.DESCENDING
-    )
-    if category:
-        query = query.where("category", "==", category)
-    docs = query.limit(limit).stream()
-    memories = []
-    for doc in docs:
-        memories.append(doc.to_dict())
-    return memories
+    return []
 
 
 def clear_user_memories(telegram_id, category=None):
-    if not db:
-        return
-    user_ref = db.collection("users").document(str(telegram_id))
-    query = user_ref.collection("memories")
-    if category:
-        query = query.where("category", "==", category)
-    docs = query.stream()
-    for doc in docs:
-        doc.reference.delete()
+    pass
 
 
 def save_announcement(text, admin_id):
@@ -178,17 +152,6 @@ def hard_reset_user_data(telegram_id):
     if not db:
         return
     user_ref = db.collection("users").document(str(telegram_id))
-    # Clear Conversations
+    # Clear Conversations only (memories disabled)
     for doc in user_ref.collection("conversations").stream():
         doc.reference.delete()
-    # Clear Memories
-    for doc in user_ref.collection("memories").stream():
-        doc.reference.delete()
-    # Clear Profile
-    user_ref.update(
-        {
-            "psych_profile": firestore.DELETE_FIELD,
-            "profile_tags": firestore.DELETE_FIELD,
-            "last_profile_update": firestore.DELETE_FIELD,
-        }
-    )

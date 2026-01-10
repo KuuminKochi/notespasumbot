@@ -94,53 +94,18 @@ async def announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not uid or uid == str(context.bot.id):
                 continue
 
-            # A. Generate Personal Note (Only if we have text/caption context)
+            # A. Generate Personal Note (DISABLED - memories disabled for refactoring)
+            # Personal comments are skipped
             personal_note = ""
-            # Don't try to personalize if text is super short or non-existent
-            if len(announcement_text) > 5 or media_type:
-                memories = firebase_db.get_user_memories(uid, limit=5)
-                if memories:
-                    # If there's an image, analyze it first
-                    image_analysis = ""
-                    if media_type == "photo" and file_id:
-                        try:
-                            photo_file = await context.bot.get_file(file_id)
-                            img_bytes = await photo_file.download_as_bytearray()
-                            base64_image = base64.b64encode(img_bytes).decode("utf-8")
-                            vision_prompt = "Describe this image in 1-2 sentences."
-                            image_analysis = await loop.run_in_executor(
-                                concurrency.get_pool(),
-                                vision.call_vision_ai,
-                                base64_image,
-                                vision_prompt,
-                            )
-                            if image_analysis:
-                                announcement_context = f"Image shows: {image_analysis}. {announcement_text}"
-                            else:
-                                announcement_context = announcement_text
-                        except:
-                            announcement_context = announcement_text
-                    else:
-                        announcement_context = announcement_text
-
-                    # Run AI in executor to prevent blocking
-                    personal_note = await loop.run_in_executor(
-                        concurrency.get_pool(),
-                        ai_tutor.generate_announcement_comment,
-                        announcement_context,
-                        memories,
-                    )
 
             # B. Format Final Caption/Message
             # Base content
             if announcement_text:
-                final_content = f"📢 **ANNOUNCEMENT**\n\n{announcement_text}"
+                final_content = f"📢 <b>ANNOUNCEMENT</b>\n\n{announcement_text}"
             else:
-                final_content = "📢 **ANNOUNCEMENT**"  # File only case
+                final_content = "📢 <b>ANNOUNCEMENT</b>"  # File only case
 
-            # Append Mimi's note
-            if personal_note:
-                final_content += f"\n\n<i>Mimi: {personal_note}</i>"
+            # No Mimi's note appended (memories disabled)
 
             # C. Send based on type
             # Use HTML parsing consistently with the rest of the bot

@@ -54,8 +54,6 @@ app.add_handler(CommandHandler("jottednotes", jottednotes.jotted_notes))
 # New AI Management Commands
 app.add_handler(CommandHandler("hardreset", commands.hard_reset))
 app.add_handler(CommandHandler("reset", commands.soft_reset))
-app.add_handler(CommandHandler("memories", commands.show_memories))
-app.add_handler(CommandHandler("reprofile", commands.reprofile))
 app.add_handler(CommandHandler("announce", announcer.announce))
 app.add_handler(CommandHandler("addadmin", admin_manager.add_admin))
 app.add_handler(CommandHandler("removeadmin", admin_manager.remove_admin))

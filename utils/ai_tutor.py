@@ -40,11 +40,12 @@ def load_file(path):
 async def stream_ai_response(update, context, status_msg, user_message, model_id=None):
     """
     Streams AI response to Telegram using HTML mode.
+    Memory system disabled for refactoring.
     """
     telegram_id = update.effective_user.id
     user_name = update.effective_user.first_name or "Student"
 
-    # 1. Setup Context
+    # 1. Setup Context (no memories)
     global_rules = load_file(GLOBAL_PROMPT_FILE)
     persona = load_file(PERSONA_PROMPT_FILE)
     now = datetime.now(KL_TZ)
@@ -54,19 +55,16 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
         .replace("{{current_time}}", now.strftime("%H:%M"))
     )
 
-    memories = firebase_db.get_user_memories(telegram_id, category="User", limit=8)
-    memory_block = ""
-    if memories:
-        memory_block = f"\n\n**What {user_name} has told Mimi:**\n" + "\n".join(
-            [f"- {m.get('content')}" for m in memories]
-        )
-
-    persona_instruction = "\n\nCRITICAL: You MUST use HTML tags for formatting (<i>italics</i> for gestures, <b>bold</b> for emphasis, <code>code</code> for math/Latex). NEVER use Markdown (* or _)."
-
-    # Restructure: Bio -> Memories -> MANDATORY Grounding Rules
-    system_content = (
-        f"{global_rules}\n\n{persona}\n\n{memory_block}\n\n---\n\n{persona_instruction}"
+    # System instruction with no-links rule
+    persona_instruction = (
+        "\n\nCRITICAL RULES:\n"
+        "1. NEVER embed any links, URLs, or web addresses - explain concepts in your own words\n"
+        "2. Use HTML tags for formatting: <i>italics</i>, <b>bold</b>, <code>code</code>\n"
+        "3. NEVER use Markdown (* or _)\n"
     )
+
+    # No memory block - system content is clean
+    system_content = f"{global_rules}\n\n{persona}\n\n{persona_instruction}"
 
     history = firebase_db.get_recent_context(telegram_id, limit=5)
 
@@ -120,7 +118,7 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
                     update, context, status_msg, user_message, FALLBACK_MODEL
                 )
             await status_msg.edit_text(
-                f"⚠️ Error: {response.status_code}", parse_mode="HTML"
+                f"API Error: {response.status_code}", parse_mode="HTML"
             )
             return
 
@@ -142,7 +140,6 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
                             ).strip()
                             if clean_text:
                                 try:
-                                    # Use HTML parse mode for streaming updates
                                     await status_msg.edit_text(
                                         clean_text + " ▌", parse_mode="HTML"
                                     )
@@ -156,34 +153,26 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
 
         # Safety Net: Strip ALL URLs to prevent link spamming
         final_text = re.sub(r"http[s]?://\S+", "[Link Removed]", final_text)
-        final_text = re.sub(
-            r"\[.+\]\(.+\)", "[Link Removed]", final_text
-        )  # Markdown links
-        final_text = re.sub(r"www\.\S+", "[Link Removed]", final_text)  # www links
+        final_text = re.sub(r"\[.+\]\(.+\)", "[Link Removed]", final_text)
+        final_text = re.sub(r"www\.\S+", "[Link Removed]", final_text)
         final_text = re.sub(
             r"\.com\S*|\.org\S*|\.edu\S*|\.gov\S*|\.net\S*|\.io\S*",
             "[Link Removed]",
             final_text,
-        )  # Common TLDs
-        final_text = re.sub(
-            r"\s+\.\s+com\s*", " [Link Removed] ", final_text
-        )  # " . com" format
-        final_text = re.sub(
-            r"\s+\(dot\)\s+", " [Link Removed] ", final_text
-        )  # " (dot) " format
-        final_text = re.sub(
-            r"\s+\(\s*\.\s*\)\s+", " [Link Removed] ", final_text
-        )  # " ( . ) " format
+        )
+        final_text = re.sub(r"\s+\.\s+com\s*", " [Link Removed] ", final_text)
+        final_text = re.sub(r"\s+\(dot\)\s+", " [Link Removed] ", final_text)
+        final_text = re.sub(r"\s+\(\s*\.\s*\)\s+", " [Link Removed] ", final_text)
         final_text = re.sub(
             r"(?i)gmail\.com|yahoo\.com|outlook\.com|hotmail\.com",
-            "[Email Domain Removed]",
+            "[Email Removed]",
             final_text,
-        )  # Email domains
+        )
         final_text = re.sub(
             r"(?i)wikipedia\.org|khanacademy\.org|youtube\.com",
             "[Link Removed]",
             final_text,
-        )  # Common educational sites
+        )
 
         if not final_text:
             final_text = "I'm sorry, I couldn't generate a response."
@@ -194,7 +183,7 @@ async def stream_ai_response(update, context, status_msg, user_message, model_id
         firebase_db.log_conversation(telegram_id, "assistant", final_text)
 
     except Exception as e:
-        await status_msg.edit_text(f"⚠️ Error: {str(e)}", parse_mode="HTML")
+        await status_msg.edit_text(f"Error: {str(e)}", parse_mode="HTML")
 
 
 def get_ai_response(telegram_id, user_message, user_name="Student"):
@@ -202,23 +191,4 @@ def get_ai_response(telegram_id, user_message, user_name="Student"):
 
 
 def generate_announcement_comment(announcement_text, user_memories):
-    if not OPENROUTER_API_KEY:
-        return ""
-    memories_text = "\n".join([f"- {m.get('content')}" for m in user_memories])
-    prompt = f"Announcement: {announcement_text}\nMemories: {memories_text}\nWrite 1 short sentence."
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": CHAT_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 60,
-    }
-    try:
-        resp = requests.post(
-            f"{BASE_URL}/chat/completions", headers=headers, json=payload, timeout=15
-        )
-        return resp.json()["choices"][0]["message"]["content"].strip()
-    except:
-        return ""
+    return ""
