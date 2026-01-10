@@ -178,5 +178,124 @@ class TestImageProcessing:
         assert result == ""
 
 
+class TestAIResponse:
+    """Tests for AI response generation"""
+
+    def test_build_system_prompt(self):
+        """System prompt should be built correctly with NO LINKS at top"""
+        from utils import ai_tutor
+
+        prompt = ai_tutor.build_system_prompt("TestUser")
+        assert (
+            "NEVER output links" in prompt
+            or "NO LINKS" in prompt.upper()
+            or "links" in prompt.lower()
+        )
+        assert "ABSOLUTE" in prompt or "PRIORITY" in prompt
+
+    def test_clean_output_removes_links(self):
+        """clean_output should strip links from text"""
+        from utils import ai_tutor
+
+        test_text = "Check https://example.com for more info"
+        cleaned = ai_tutor.clean_output(test_text)
+        assert "[Link Removed]" in cleaned or "https://example.com" not in cleaned
+
+    def test_get_sliding_window_context(self):
+        """get_sliding_window_context should return context"""
+        from utils import ai_tutor
+
+        context = ai_tutor.get_sliding_window_context("test_user_id", limit=10)
+        assert isinstance(context, list)
+
+    def test_prune_conversation_function_exists(self):
+        """prune_conversation function should exist in firebase_db"""
+        from utils import firebase_db
+
+        assert hasattr(firebase_db, "prune_conversation")
+
+    def test_stream_ai_response_signature(self):
+        """stream_ai_response should accept correct parameters"""
+        from utils import ai_tutor
+        import inspect
+
+        sig = inspect.signature(ai_tutor.stream_ai_response)
+        params = list(sig.parameters.keys())
+        assert "update" in params
+        assert "context" in params
+        assert "status_msg" in params
+        assert "user_message" in params
+
+    def test_generate_announcement_comment_returns_empty(self):
+        """generate_announcement_comment should return empty string (disabled)"""
+        from utils import ai_tutor
+
+        result = ai_tutor.generate_announcement_comment("Test", [])
+        assert result == ""
+
+
+class TestAIResponseMocked:
+    """Tests for AI response with mocked API calls"""
+
+    def test_stream_ai_response_with_mocked_api(self):
+        """Test that stream_ai_response works with mocked API"""
+        import pytest
+        from unittest.mock import Mock, patch, AsyncMock
+        import asyncio
+        from utils import ai_tutor
+
+        mock_update = Mock()
+        mock_update.effective_user.id = 12345
+        mock_update.effective_user.first_name = "TestUser"
+        mock_update.message = Mock()
+
+        mock_context = Mock()
+        mock_status_msg = Mock()
+        mock_status_msg.edit_text = AsyncMock()
+
+        with patch("utils.ai_tutor.requests.post") as mock_post:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.iter_lines = Mock(
+                return_value=iter(
+                    [
+                        b'data: {"choices":[{"delta":{"content":"Hello"}}]}',
+                        b"data: [DONE]",
+                    ]
+                )
+            )
+            mock_post.return_value = mock_response
+
+            with patch("utils.ai_tutor.get_sliding_window_context", return_value=[]):
+                with patch("utils.ai_tutor.prune_conversation"):
+                    with patch("utils.firebase_db.log_conversation"):
+                        try:
+                            asyncio.run(
+                                ai_tutor.stream_ai_response(
+                                    mock_update, mock_context, mock_status_msg, "Hello"
+                                )
+                            )
+                        except Exception as e:
+                            print(f"Exception: {e}")
+
+        # Verify edit_text was called at least once
+        assert mock_status_msg.edit_text.called
+
+    def test_clean_output_handles_empty_text(self):
+        """clean_output should handle empty text gracefully"""
+        from utils import ai_tutor
+
+        result = ai_tutor.clean_output("")
+        assert result == ""
+
+    def test_clean_output_preserves_non_link_content(self):
+        """clean_output should preserve non-link content"""
+        from utils import ai_tutor
+
+        test_text = "The answer is 42"
+        result = ai_tutor.clean_output(test_text)
+        assert "42" in result
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

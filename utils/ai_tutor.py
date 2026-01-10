@@ -39,7 +39,7 @@ def build_system_prompt(user_name="Student"):
     time_context = f"Current: {now.strftime('%H:%M')} | {now.strftime('%A')}"
 
     no_links = (
-        "🔒 ABSOLUTE: NEVER output links/URLs/web addresses.\n"
+        "ABSOLUTE PRIORITY: NEVER output links/URLs/web addresses.\n"
         "Explain concepts yourself. No http://, https://, www., markdown links.\n"
     )
 
@@ -47,7 +47,7 @@ def build_system_prompt(user_name="Student"):
     persona = persona.replace("{{current_date}}", now.strftime("%Y-%m-%d"))
     persona = persona.replace("{{current_time}}", now.strftime("%H:%M"))
 
-    format_note = "\n📝 Use HTML: <b>bold</b>, <i>italics</i>, <code>code</code>"
+    format_note = "\nUse HTML: <b>bold</b>, <i>italics</i>, <code>code</code>"
 
     return f"{no_links}\n{time_context}\n\n{global_rules}\n\n{persona}\n\n{format_note}"
 
@@ -110,12 +110,7 @@ async def stream_ai_response(update, context, status_msg, user_message):
         "X-Title": "NotesPASUMBot",
     }
 
-    payload = {
-        "model": CHAT_MODEL,
-        "messages": messages,
-        "temperature": 0.5,
-        "stream": True,
-    }
+    payload = {"model": CHAT_MODEL, "messages": messages, "temperature": 0.5}
 
     full_text = ""
     last_update = 0
@@ -125,45 +120,32 @@ async def stream_ai_response(update, context, status_msg, user_message):
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
             None,
-            lambda: requests.post(
-                BASE_URL, headers=headers, json=payload, stream=True, timeout=90
-            ),
+            lambda: requests.post(BASE_URL, headers=headers, json=payload, timeout=90),
         )
 
         if response.status_code != 200:
-            await status_msg.edit_text(f"Error: {response.status_code}")
+            await status_msg.edit_text(f"API Error: {response.status_code}")
             return
 
-        for line in response.iter_lines():
-            if line:
-                line = line.decode("utf-8")
-                if line.startswith("data: ") and line != "data: [DONE]":
-                    try:
-                        data = json.loads(line[6:])
-                        content = data["choices"][0]["delta"].get("content", "")
-                        if content:
-                            full_text += content
-                            if time.time() - last_update > update_interval:
-                                clean = re.sub(
-                                    r"\[\d{2}:\d{2}\]\s*", "", full_text
-                                ).strip()
-                                if clean:
-                                    await status_msg.edit_text(
-                                        clean + " ▌", parse_mode="HTML"
-                                    )
-                                    last_update = time.time()
-                    except:
-                        pass
+        try:
+            data = response.json()
+            if "choices" in data and len(data["choices"]) > 0:
+                full_text = data["choices"][0]["message"].get("content", "")
+            else:
+                full_text = ""
+        except json.JSONDecodeError:
+            full_text = ""
 
-        final = clean_output(full_text)
-        if not final:
-            final = "I couldn't generate a response. Please try again."
-
-        await status_msg.edit_text(final, parse_mode="HTML")
-
-        prune_conversation(telegram_id)
-        firebase_db.log_conversation(telegram_id, "user", user_message)
-        firebase_db.log_conversation(telegram_id, "assistant", final)
+        if full_text:
+            final = clean_output(full_text)
+            await status_msg.edit_text(final, parse_mode="HTML")
+            prune_conversation(telegram_id)
+            firebase_db.log_conversation(telegram_id, "user", user_message)
+            firebase_db.log_conversation(telegram_id, "assistant", final)
+        else:
+            await status_msg.edit_text(
+                "I couldn't generate a response. Please try again."
+            )
 
     except Exception as e:
         await status_msg.edit_text(f"Error: {str(e)}")

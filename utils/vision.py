@@ -86,13 +86,9 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
             )
 
         model_id = "deepseek/deepseek-r1" if is_complex else "deepseek/deepseek-chat"
-        reasoning_prompt = (
-            f"Image Transcription: {extracted_text}\n\nPlease solve/answer this."
-        )
+        reasoning_prompt = f"[Model: {model_id}]\nImage Transcription: {extracted_text}\n\nPlease solve/answer this."
 
-        await ai_tutor.stream_ai_response(
-            update, context, status_msg, reasoning_prompt, model_id
-        )
+        await ai_tutor.stream_ai_response(update, context, status_msg, reasoning_prompt)
 
     except Exception as e:
         try:
