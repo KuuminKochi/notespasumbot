@@ -17,7 +17,7 @@ BASE_URL = "https://openrouter.ai/api/v1"
 KL_TZ = pytz.timezone("Asia/Kuala_Lumpur")
 
 # Model Selection
-CHAT_MODEL = "xiaomi/mimo-v2-flash"
+CHAT_MODEL = "xiaomi/mimo-v2-flash:free"
 FALLBACK_MODEL = "deepseek/deepseek-chat"
 REASONER_MODEL = "deepseek/deepseek-r1"
 
