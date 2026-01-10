@@ -111,51 +111,72 @@ async def stream_ai_response(update, context, status_msg, user_message):
         "X-Title": "NotesPASUMBot",
     }
 
-    payload = {"model": CHAT_MODEL, "messages": messages, "temperature": 0.5}
+    payload = {
+        "model": CHAT_MODEL,
+        "messages": messages,
+        "temperature": 0.5,
+        "stream": True,
+    }
 
     full_text = ""
-    last_update = 0
-    update_interval = 1.0
+    buffer = ""
 
     try:
-        print(f"DEBUG: Calling OpenRouter API with model: {CHAT_MODEL}")
+        print(f"DEBUG: Calling OpenRouter API (streaming) with model: {CHAT_MODEL}")
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
             None,
             lambda: requests.post(
-                CHAT_ENDPOINT, headers=headers, json=payload, timeout=90
+                CHAT_ENDPOINT, headers=headers, json=payload, timeout=90, stream=True
             ),
         )
 
         print(f"DEBUG: API Response status: {response.status_code}")
-        print(f"DEBUG: API Response body: {response.text[:500]}")
 
         if response.status_code != 200:
             await status_msg.edit_text(f"API Error: {response.status_code}")
             return
 
-        try:
-            data = response.json()
-            print(f"DEBUG: Parsed JSON: {json.dumps(data)[:500]}")
-            if "choices" in data and len(data["choices"]) > 0:
-                full_text = data["choices"][0]["message"].get("content", "")
-            else:
-                full_text = ""
-                print("DEBUG: No choices in response")
-        except json.JSONDecodeError as e:
-            print(f"DEBUG: JSON decode error: {e}")
-            full_text = ""
+        await status_msg.edit_text("▌")
 
-        if full_text:
+        for line in response.iter_lines():
+            if line:
+                line_str = line.decode("utf-8")
+                if line_str.startswith("data: "):
+                    data = line_str[6:]
+                    if data == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data)
+                        if "choices" in chunk and len(chunk["choices"]) > 0:
+                            delta = chunk["choices"][0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                buffer += content
+                                if len(buffer) >= 30:
+                                    final = clean_output(buffer)
+                                    await status_msg.edit_text(
+                                        final + "▌", parse_mode="HTML"
+                                    )
+                                    buffer = ""
+                    except json.JSONDecodeError:
+                        pass
+
+        if buffer:
+            final = clean_output(buffer)
+            await status_msg.edit_text(final, parse_mode="HTML")
+        elif full_text:
             final = clean_output(full_text)
             await status_msg.edit_text(final, parse_mode="HTML")
-            prune_conversation(telegram_id)
-            firebase_db.log_conversation(telegram_id, "user", user_message)
-            firebase_db.log_conversation(telegram_id, "assistant", final)
         else:
             await status_msg.edit_text(
                 "I couldn't generate a response. Please try again."
             )
+            return
+
+        prune_conversation(telegram_id)
+        firebase_db.log_conversation(telegram_id, "user", user_message)
+        firebase_db.log_conversation(telegram_id, "assistant", final)
 
     except Exception as e:
         await status_msg.edit_text(f"Error: {str(e)}")
