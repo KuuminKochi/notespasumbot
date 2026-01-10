@@ -142,25 +142,31 @@ async def stream_ai_response(update, context, status_msg, user_message):
         for line in response.iter_lines():
             if line:
                 line_str = line.decode("utf-8")
+                print(f"DEBUG: Raw line: {line_str[:100]}")
                 if line_str.startswith("data: "):
                     data = line_str[6:]
                     if data == "[DONE]":
+                        print("DEBUG: Stream done")
                         break
                     try:
                         chunk = json.loads(data)
+                        print(f"DEBUG: Chunk keys: {chunk.keys()}")
                         if "choices" in chunk and len(chunk["choices"]) > 0:
                             delta = chunk["choices"][0].get("delta", {})
+                            print(f"DEBUG: Delta: {delta}")
                             content = delta.get("content", "")
+                            print(f"DEBUG: Content: '{content}'")
                             if content:
                                 buffer += content
+                                print(f"DEBUG: Buffer: '{buffer[:50]}...'")
                                 if len(buffer) >= 30:
                                     final = clean_output(buffer)
                                     await status_msg.edit_text(
                                         final + "▌", parse_mode="HTML"
                                     )
                                     buffer = ""
-                    except json.JSONDecodeError:
-                        pass
+                    except json.JSONDecodeError as e:
+                        print(f"DEBUG: JSON decode error: {e}")
 
         if buffer:
             final = clean_output(buffer)
