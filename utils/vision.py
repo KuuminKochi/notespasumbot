@@ -9,12 +9,7 @@ from telegram.ext import ContextTypes
 import asyncio
 from . import ai_tutor
 
-# Config
-XAI_API_KEY = os.getenv("XAI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-# Splash text rotation to avoid repetition
-last_splash_index = -1
 
 SPLASH_TEXTS = [
     "Mimi is sharpening her pencils...",
@@ -44,21 +39,12 @@ SPLASH_TEXTS = [
 
 
 async def process_image_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Analyzes images with Nemotron (with timeout) and solves with Reasoner or Chat (Streaming).
-    """
     if not update.message:
         return
 
-    # Rotate splash text to avoid repetition
-    global last_splash_index
-    last_splash_index = (last_splash_index + 1) % len(SPLASH_TEXTS)
-    splash_text = SPLASH_TEXTS[last_splash_index]
-
-    status_msg = await update.message.reply_text(f"👀 {splash_text}")
+    status_msg = await update.message.reply_text(f"👀 {random.choice(SPLASH_TEXTS)}")
 
     try:
-        # 1. Determine Photo Source
         photo_obj = None
         if update.message.photo:
             photo_obj = update.message.photo[-1]
@@ -71,33 +57,22 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
             )
             return
 
-        # Download
         photo_file = await photo_obj.get_file()
         img_bytes = await photo_file.download_as_bytearray()
         base64_image = base64.b64encode(img_bytes).decode("utf-8")
 
-        # 2. Vision Analysis
-        await status_msg.edit_text(
-            f"🧠 {random.choice(SPLASH_TEXTS)}", parse_mode="HTML"
-        )
+        vision_prompt = """Describe this image exactly. If it is a math/science problem, transcribe all symbols and text. Output JSON: {"transcription": "...", "is_complex": true/false}"""
 
-        vision_prompt = """
-        Describe this image exactly. If it is a math/science problem, transcribe all symbols and text.
-        Output JSON: {"transcription": "...", "is_complex": true/false}
-        Set is_complex to true if it requires deep reasoning or calculation.
-        """
-
-        # Call vision with 30s timeout
         vision_raw = await asyncio.to_thread(
             call_vision_ai, base64_image, vision_prompt
         )
+
         if not vision_raw:
             await status_msg.edit_text(
-                "❌ Mimi got a bit distracted (Vision Timeout).", parse_mode="HTML"
+                "⚠️ Could not analyze image. Please try again.", parse_mode="HTML"
             )
             return
 
-        # Parse Complexity
         try:
             clean_json = re.sub(r"```json\n|\n```", "", vision_raw).strip()
             v_data = json.loads(clean_json)
@@ -110,25 +85,20 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
                 for word in ["solve", "calculate", "derive", "math"]
             )
 
-        # 3. Decision
-        action = "thinking" if is_complex else "analyzing"
-        await status_msg.edit_text(
-            f"🤔 {random.choice(SPLASH_TEXTS)}", parse_mode="HTML"
-        )
-
         model_id = "deepseek/deepseek-r1" if is_complex else "deepseek/deepseek-chat"
         reasoning_prompt = (
             f"Image Transcription: {extracted_text}\n\nPlease solve/answer this."
         )
 
-        # 4. Stream Final Answer
         await ai_tutor.stream_ai_response(
             update, context, status_msg, reasoning_prompt, model_id
         )
 
     except Exception as e:
         try:
-            await status_msg.edit_text(f"⚠️ Error: {str(e)}", parse_mode="HTML")
+            await status_msg.edit_text(
+                f"⚠️ Error processing image: {str(e)}", parse_mode="HTML"
+            )
         except:
             pass
 
@@ -143,8 +113,6 @@ def call_vision_ai(base64_img, prompt):
         "HTTP-Referer": "https://github.com/KuuminKochi/notespasumbot",
         "X-Title": "NotesPASUMBot",
     }
-
-    # Nemotron Free with timeout
     payload = {
         "model": "nvidia/nemotron-nano-12b-v2-vl:free",
         "messages": [
@@ -161,19 +129,13 @@ def call_vision_ai(base64_img, prompt):
         ],
         "temperature": 0.1,
     }
-
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=35)
         if resp.status_code == 200:
             return resp.json()["choices"][0]["message"]["content"]
         else:
-            print(f"ERROR: Vision API returned status {resp.status_code}")
-            print(f"Response body: {resp.text[:500]}")
+            print(f"ERROR: Vision API {resp.status_code}")
             return None
-    except requests.Timeout:
-        print("ERROR: Vision API timeout after 35s")
-        return None
     except Exception as e:
         print(f"ERROR: Vision API exception: {e}")
         return None
-    return None

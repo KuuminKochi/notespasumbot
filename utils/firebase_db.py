@@ -47,6 +47,24 @@ def log_conversation(telegram_id, role, content):
     user_ref.collection("conversations").add(msg_data)
 
 
+def prune_conversation(telegram_id, max_messages=50, delete_count=25):
+    """Prune oldest messages when conversation exceeds max_messages."""
+    if not db:
+        return
+    user_ref = db.collection("users").document(str(telegram_id))
+    conv_ref = user_ref.collection("conversations")
+
+    total = len(list(conv_ref.stream()))
+    if total <= max_messages:
+        return
+
+    old_docs = conv_ref.order_by("timestamp").limit(delete_count).stream()
+    count = 0
+    for doc in old_docs:
+        doc.reference.delete()
+        count += 1
+
+
 def get_recent_context(telegram_id, limit=5):
     """
     Retrieves the last N messages (Sliding Window: 5 messages).
