@@ -1,5 +1,5 @@
 import os
-import requests
+import httpx
 import json
 import pytz
 import re
@@ -133,46 +133,40 @@ async def stream_ai_response(update, context, status_msg, user_message):
 
     try:
         print(f"DEBUG: Calling OpenRouter API (streaming) with model: {CHAT_MODEL}")
-        loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(
-            None,
-            lambda: requests.post(
-                CHAT_ENDPOINT, headers=headers, json=payload, timeout=90, stream=True
-            ),
-        )
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            async with client.stream(
+                "POST", CHAT_ENDPOINT, headers=headers, json=payload
+            ) as response:
+                print(f"DEBUG: API Response status: {response.status_code}")
 
-        print(f"DEBUG: API Response status: {response.status_code}")
+                if response.status_code != 200:
+                    await status_msg.edit_text(f"API Error: {response.status_code}")
+                    return
 
-        if response.status_code != 200:
-            await status_msg.edit_text(f"API Error: {response.status_code}")
-            return
+                await status_msg.edit_text("▌")
+                buffer = ""
+                last_visible = ""
 
-        await status_msg.edit_text("▌")
-        buffer = ""
-        last_visible = ""
-
-        for line in response.iter_lines():
-            if line:
-                line_str = line.decode("utf-8")
-                if line_str.startswith("data: "):
-                    data = line_str[6:]
-                    if data == "[DONE]":
-                        break
-                    try:
-                        chunk = json.loads(data)
-                        if "choices" in chunk and len(chunk["choices"]) > 0:
-                            delta = chunk["choices"][0].get("delta", {})
-                            content = delta.get("content", "")
-                            if content:
-                                buffer += content
-                                visible = clean_output(buffer) + "▌"
-                                if visible != last_visible:
-                                    last_visible = visible
-                                    await status_msg.edit_text(
-                                        visible, parse_mode="HTML"
-                                    )
-                    except json.JSONDecodeError:
-                        pass
+                async for line in response.aiter_lines():
+                    if line.startswith("data: "):
+                        data = line[6:]
+                        if data == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            if "choices" in chunk and len(chunk["choices"]) > 0:
+                                delta = chunk["choices"][0].get("delta", {})
+                                content = delta.get("content", "")
+                                if content:
+                                    buffer += content
+                                    visible = clean_output(buffer) + "▌"
+                                    if visible != last_visible:
+                                        last_visible = visible
+                                        await status_msg.edit_text(
+                                            visible, parse_mode="HTML"
+                                        )
+                        except json.JSONDecodeError:
+                            pass
 
         final = clean_output(buffer)
 
