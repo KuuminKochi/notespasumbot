@@ -139,11 +139,6 @@ async def stream_ai_response(update, context, status_msg, user_message):
         "stream": True,
     }
 
-    buffer = ""
-    revealed_count = 0
-    CHARS_PER_EDIT = 2
-    EDIT_DELAY = 0.008
-
     try:
         print(f"DEBUG: Calling OpenRouter API (streaming) with model: {CHAT_MODEL}")
         loop = asyncio.get_running_loop()
@@ -160,8 +155,7 @@ async def stream_ai_response(update, context, status_msg, user_message):
             await status_msg.edit_text(f"API Error: {response.status_code}")
             return
 
-        await status_msg.edit_text("▌")
-
+        buffer = ""
         for line in response.iter_lines():
             if line:
                 line_str = line.decode("utf-8")
@@ -176,12 +170,6 @@ async def stream_ai_response(update, context, status_msg, user_message):
                             content = delta.get("content", "")
                             if content:
                                 buffer += content
-                                revealed_count += len(content)
-                                visible_text = clean_output(buffer[:revealed_count])
-                                await status_msg.edit_text(
-                                    visible_text + "▌", parse_mode="HTML"
-                                )
-                                await asyncio.sleep(EDIT_DELAY)
                     except json.JSONDecodeError:
                         pass
 
