@@ -55,7 +55,13 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_photo = update.message.reply_to_message.photo
 
     if target_photo:
+        context.user_data["processing_image"] = True
         await vision.process_image_question(update, context)
+        return
+
+    # 3b. Skip if image processing flag is set (prevents duplicate handling)
+    if context.user_data.get("processing_image"):
+        context.user_data["processing_image"] = False
         return
 
     # 4. Text Streaming

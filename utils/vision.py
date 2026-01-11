@@ -88,6 +88,9 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
         model_id = "deepseek/deepseek-r1" if is_complex else "deepseek/deepseek-chat"
         reasoning_prompt = f"[Model: {model_id}]\nImage Transcription: {extracted_text}\n\nPlease solve/answer this."
 
+        print(
+            f"DEBUG: Vision: Nemotron transcription ({len(extracted_text)} chars): {extracted_text[:100]}..."
+        )
         await ai_tutor.stream_ai_response(update, context, status_msg, reasoning_prompt)
 
     except Exception as e:

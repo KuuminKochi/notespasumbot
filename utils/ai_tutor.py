@@ -65,7 +65,16 @@ def clean_output(text):
     ]
     for pattern, replacement in patterns:
         text = re.sub(pattern, replacement, text)
-    return text.strip()
+    return escape_html(text).strip()
+
+
+def escape_html(text):
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
 
 
 def get_sliding_window_context(telegram_id, limit=10):
@@ -96,6 +105,18 @@ async def stream_ai_response(update, context, status_msg, user_message):
     system_content = build_system_prompt(user_name)
     history = get_sliding_window_context(telegram_id, limit=10)
 
+    history_chars = sum(len(m.get("content", "")) for m in history)
+    print(f"DEBUG: History: {len(history)} messages, {history_chars} chars total")
+    print(
+        f"DEBUG: History content:\n"
+        + "\n".join(
+            [
+                f"  [{m.get('role', '?')}] {m.get('content', '')[:50]}..."
+                for m in history
+            ]
+        )
+    )
+
     messages = [{"role": "system", "content": system_content}]
     messages.extend(history)
 
@@ -121,7 +142,7 @@ async def stream_ai_response(update, context, status_msg, user_message):
     buffer = ""
     revealed_count = 0
     CHARS_PER_EDIT = 2
-    EDIT_DELAY = 0.05
+    EDIT_DELAY = 0.008
 
     try:
         print(f"DEBUG: Calling OpenRouter API (streaming) with model: {CHAT_MODEL}")

@@ -45,6 +45,9 @@ def log_conversation(telegram_id, role, content):
     user_ref = db.collection("users").document(str(telegram_id))
     msg_data = {"role": role, "content": content, "timestamp": datetime.datetime.now()}
     user_ref.collection("conversations").add(msg_data)
+    print(
+        f"DEBUG: Firestore: Saving {role} message ({len(content)} chars) for user {telegram_id}"
+    )
 
 
 def prune_conversation(telegram_id, max_messages=50, delete_count=25):
@@ -81,7 +84,12 @@ def get_recent_context(telegram_id, limit=5):
     messages = []
     for doc in docs:
         messages.append(doc.to_dict())
-    return messages[::-1]
+    result = messages[::-1]
+    total_chars = sum(len(m.get("content", "")) for m in result)
+    print(
+        f"DEBUG: Firestore: Retrieved {len(result)} messages ({total_chars} chars) for user {telegram_id}"
+    )
+    return result
 
 
 # Memory functions are DISABLED for refactoring
