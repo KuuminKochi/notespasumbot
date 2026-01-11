@@ -61,7 +61,18 @@ async def process_image_question(update: Update, context: ContextTypes.DEFAULT_T
         img_bytes = await photo_file.download_as_bytearray()
         base64_image = base64.b64encode(img_bytes).decode("utf-8")
 
-        vision_prompt = """Describe this image exactly. If it is a math/science problem, transcribe all symbols and text. Output JSON: {"transcription": "...", "is_complex": true/false}"""
+        vision_prompt = """Transcribe EVERYTHING in this image in complete detail. Do not summarize.
+
+For TEXT: Copy every word, number, and symbol exactly as written.
+For DOCUMENTS: Include all text, formatting, headers, bullet points, page numbers.
+For SCREENSHOTS: Transcribe all visible text, UI elements, buttons, menus.
+For PHOTOS OF THINGS: Describe what you see with rich detail (colors, text, labels, brands, numbers).
+For HANDWRITTEN NOTES: Read and transcribe every word and equation.
+
+Output JSON format:
+{"transcription": "...", "is_complex": true/false}
+
+Be as thorough as possible - missing details could cause the AI to misunderstand the user's request."""
 
         vision_raw = await asyncio.to_thread(
             call_vision_ai, base64_image, vision_prompt
