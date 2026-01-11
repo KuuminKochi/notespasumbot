@@ -146,6 +146,8 @@ async def stream_ai_response(update, context, status_msg, user_message):
                 await status_msg.edit_text("▌")
                 buffer = ""
                 last_visible = ""
+                last_update_time = asyncio.get_event_loop().time()
+                UPDATE_INTERVAL = 1.0  # Update every 1 second
 
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
@@ -159,14 +161,18 @@ async def stream_ai_response(update, context, status_msg, user_message):
                                 content = delta.get("content", "")
                                 if content:
                                     buffer += content
-                                    visible = clean_output(buffer) + "▌"
-                                    if visible != last_visible:
-                                        last_visible = visible
-                                        await status_msg.edit_text(
-                                            visible, parse_mode="HTML"
-                                        )
                         except json.JSONDecodeError:
                             pass
+
+                    current_time = asyncio.get_event_loop().time()
+                    visible = clean_output(buffer) + "▌"
+                    if (
+                        visible != last_visible
+                        and (current_time - last_update_time) >= UPDATE_INTERVAL
+                    ):
+                        last_visible = visible
+                        last_update_time = current_time
+                        await status_msg.edit_text(visible, parse_mode="HTML")
 
         final = clean_output(buffer)
 
