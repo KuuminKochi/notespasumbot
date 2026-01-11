@@ -82,14 +82,6 @@ def get_sliding_window_context(telegram_id, limit=10):
     formatted = []
     for msg in context:
         content = msg.get("content", "")
-        if "timestamp" in msg:
-            try:
-                ts = msg["timestamp"]
-                if hasattr(ts, "astimezone"):
-                    time_str = ts.astimezone(KL_TZ).strftime("%H:%M")
-                    content = f"[{time_str}] {content}"
-            except:
-                pass
         formatted.append({"role": msg.get("role", "user"), "content": content})
     return formatted
 
@@ -155,7 +147,10 @@ async def stream_ai_response(update, context, status_msg, user_message):
             await status_msg.edit_text(f"API Error: {response.status_code}")
             return
 
+        await status_msg.edit_text("▌")
         buffer = ""
+        last_update = 0
+
         for line in response.iter_lines():
             if line:
                 line_str = line.decode("utf-8")
@@ -170,6 +165,10 @@ async def stream_ai_response(update, context, status_msg, user_message):
                             content = delta.get("content", "")
                             if content:
                                 buffer += content
+                                visible = clean_output(buffer)
+                                await status_msg.edit_text(
+                                    visible + "▌", parse_mode="HTML"
+                                )
                     except json.JSONDecodeError:
                         pass
 
