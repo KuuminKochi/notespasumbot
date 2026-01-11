@@ -149,7 +149,7 @@ async def stream_ai_response(update, context, status_msg, user_message):
 
         await status_msg.edit_text("▌")
         buffer = ""
-        last_update = 0
+        last_visible = ""
 
         for line in response.iter_lines():
             if line:
@@ -165,17 +165,20 @@ async def stream_ai_response(update, context, status_msg, user_message):
                             content = delta.get("content", "")
                             if content:
                                 buffer += content
-                                visible = clean_output(buffer)
-                                await status_msg.edit_text(
-                                    visible + "▌", parse_mode="HTML"
-                                )
+                                visible = clean_output(buffer) + "▌"
+                                if visible != last_visible:
+                                    last_visible = visible
+                                    await status_msg.edit_text(
+                                        visible, parse_mode="HTML"
+                                    )
                     except json.JSONDecodeError:
                         pass
 
         final = clean_output(buffer)
 
         if final:
-            await status_msg.edit_text(final, parse_mode="HTML")
+            if final != last_visible.rstrip("▌"):
+                await status_msg.edit_text(final, parse_mode="HTML")
             print(f"DEBUG: Final response: {final[:100]}...")
         else:
             await status_msg.edit_text(
