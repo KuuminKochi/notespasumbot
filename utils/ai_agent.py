@@ -22,7 +22,7 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "web_search",
-            "description": "Search the internet for current information.",
+            "description": "Search the internet for up-to-date information.",
             "parameters": {
                 "type": "object",
                 "properties": {"query": {"type": "string"}},
@@ -33,12 +33,48 @@ TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
+            "name": "web_batch_search",
+            "description": "PREFER THIS TOOL when handling multiple queries. Search multiple queries in parallel for efficiency.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "queries": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of search queries",
+                    }
+                },
+                "required": ["queries"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "web_fetch",
-            "description": "Read content from a URL (HTML/PDF).",
+            "description": "Read the content of a specific URL (HTML or PDF).",
             "parameters": {
                 "type": "object",
                 "properties": {"url": {"type": "string"}},
                 "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_batch_fetch",
+            "description": "PREFER THIS TOOL when handling multiple URLs. Read multiple URLs in parallel.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "urls": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of URLs to fetch",
+                    }
+                },
+                "required": ["urls"],
             },
         },
     },
@@ -122,8 +158,12 @@ def build_system_prompt(user_name, telegram_id, chat_type="private"):
 async def execute_tool(name, args, user_id=None):
     if name == "web_search":
         return tools.web_search(args.get("query"))
+    elif name == "web_batch_search":
+        return tools.web_batch_search(args.get("queries"))
     elif name == "web_fetch":
         return tools.web_fetch(args.get("url"))
+    elif name == "web_batch_fetch":
+        return tools.web_batch_fetch(args.get("urls"))
     elif name == "perform_memory_search":
         return tools.perform_memory_search(args.get("query"), user_id)
     elif name == "add_memory":
