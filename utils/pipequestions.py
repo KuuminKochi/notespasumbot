@@ -5,7 +5,7 @@ import random
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
-from utils import firebase_db, ai_tutor, vision, concurrency
+from utils import firebase_db, ai_agent, vision, concurrency
 
 
 async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -76,6 +76,6 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         splash = random.choice(vision.SPLASH_TEXTS)
         status_msg = await update.message.reply_text(f"🤔 {splash}")
 
-        # Call the streaming version
-        await ai_tutor.stream_ai_response(update, context, status_msg, text)
+        # Call the new AI Agent (Tool-enabled)
+        await ai_agent.stream_ai_response(update, context, status_msg, text)
         return
