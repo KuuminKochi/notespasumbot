@@ -143,6 +143,7 @@ def build_system_prompt(user_name, telegram_id, chat_type="private"):
         "3. FORMAT: Strictly one short paragraph of pure dialogue/prose. No lists or bullet points.\n"
         "4. TONE: Intelligent, INTJ logic mixed with peer-like warmth. Be helpful but maintain firm boundaries against laziness.\n"
         "5. EFFICIENCY: Your reasoning must be brief and decisive. Limit yourself to ONE tool call per turn.\n"
+        "6. SEARCH FAILURES: If web search returns irrelevant results (e.g. login pages), acknowledge the failure and try a different query or rely on memory.\n"
     )
 
     return (

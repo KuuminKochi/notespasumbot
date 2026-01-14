@@ -14,18 +14,69 @@ logger = logging.getLogger(__name__)
 def web_search(query: str) -> str:
     try:
         logger.info(f"Searching for: {query}")
-        results = list(DDGS().text(query, max_results=5))
+        # Try DDGS Text Search with Region Pinning
+        # 'wt-wt' is global, 'my-en' is Malaysia English. Using 'wt-wt' for broader coverage unless specific.
+        # But user query specific to Malaysia needs region.
+        # Let's try 'wt-wt' first, but if query contains "Malaysia", switch?
+        # Actually, let's keep it simple: generic search first.
+
+        # Adding a retry loop with different backends
+        results = []
+        backends = ["text", "news"]  # Try generic text, then news specifically
+
+        blacklist = [
+            "Sign in",
+            "Log in",
+            "Microsoft Support",
+            "Zillow",
+            "Facebook - log in",
+            "Google",
+        ]
+
+        for backend in backends:
+            try:
+                if backend == "text":
+                    raw_results = list(
+                        DDGS().text(query, max_results=5, region="wt-wt")
+                    )
+                else:
+                    raw_results = list(
+                        DDGS().news(query, max_results=5, region="wt-wt")
+                    )
+
+                # Filter Garbage
+                valid_results = []
+                for r in raw_results:
+                    title = r.get("title", "")
+                    body = r.get("body", "")
+                    # Skip if title matches blacklist
+                    if any(bad in title for bad in blacklist):
+                        continue
+                    # Skip if body is too short or empty
+                    if len(body) < 20:
+                        continue
+                    valid_results.append(r)
+
+                if valid_results:
+                    results = valid_results
+                    break  # Found good results
+
+            except Exception as inner_e:
+                logger.warning(f"Backend {backend} failed: {inner_e}")
+                continue
+
         if not results:
-            logger.warning(f"No results found for: {query}")
-            return "No results found."
+            logger.warning(f"No valid results found for: {query}")
+            return "No relevant results found."
 
         output = []
         for r in results:
             title = r.get("title", "No Title")
             href = r.get("href", "#")
             body = r.get("body", "No Content")
+            source = r.get("source", "Web")
             logger.info(f"Found: {title} ({href})")
-            output.append(f"[{title}]({href})\n{body}")
+            output.append(f"[{title}]({href}) - {source}\n{body}")
 
         return "\n\n".join(output)
     except Exception as e:
