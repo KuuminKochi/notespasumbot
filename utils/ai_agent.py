@@ -81,8 +81,8 @@ def build_system_prompt(user_name):
     constraints = (
         "CONSTRAINTS:\n"
         "1. NO LINKS: Never output URLs.\n"
-        "2. FORMAT: Single short-to-medium paragraph. Concise and lively.\n"
-        "3. TONE: Intelligent, INTJ, caring but not robotic. 18yo student.\n"
+        "2. FORMAT: Strictly one paragraph. Write in a calm, narrative, novel-like style.\n"
+        "3. TONE: Grounded, introspective, and observant. Avoid ecstatic or hyper-energetic language.\n"
         "4. HTML: Use <b>, <i>, <code> only.\n"
     )
 
@@ -147,7 +147,7 @@ async def stream_ai_response(update, context, status_msg, user_message):
             "messages": messages,
             "tools": TOOLS_SCHEMA,
             "stream": True,
-            "temperature": 0.6,
+            "temperature": 0.4,
         }
 
         buffer = ""
