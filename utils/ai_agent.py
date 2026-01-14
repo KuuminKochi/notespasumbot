@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 BASE_URL = "https://openrouter.ai/api/v1"
-CHAT_MODEL = "deepseek/deepseek-chat"  # Switched to V3 for stability
+CHAT_MODEL = "xiaomi/mimo-v2-flash:free"  # Reverted to Mimo as per user request
 KL_TZ = pytz.timezone("Asia/Kuala_Lumpur")
 
 TOOLS_SCHEMA = [
