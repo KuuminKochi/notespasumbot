@@ -29,31 +29,102 @@ def get_identity_narrative() -> str:
 
 
 def sync_memories_to_firestore():
-    """Syncs local CLI memories to Firestore for the main user."""
-    if not os.path.exists(ARCHIVE_FILE):
+    """
+    Bi-directional sync between local JSON (Archive) and Firestore.
+    Rules:
+    1. Read all Firestore memories.
+    2. Read local Archive.
+    3. Merge lists (deduplicating by content + timestamp).
+    4. Write back differences to both.
+    """
+    if not firebase_db.db:
         return
 
     try:
-        with open(ARCHIVE_FILE, "r", encoding="utf-8") as f:
-            memories = json.load(f)
+        # 1. Load Local Archive
+        local_memories = []
+        if os.path.exists(ARCHIVE_FILE):
+            with open(ARCHIVE_FILE, "r", encoding="utf-8") as f:
+                local_memories = json.load(f)
 
-        if not firebase_db.db:
-            return
+        # Helper to hash memories for dedup
+        def get_mem_hash(m):
+            return f"{m.get('timestamp')}_{m.get('content')}"
 
+        local_map = {get_mem_hash(m): m for m in local_memories}
+
+        # 2. Load Firestore Memories
         user_mem_ref = (
             firebase_db.db.collection("users")
             .document(KUUMIN_ID)
             .collection("memories")
         )
+        cloud_memories = []
+        for doc in user_mem_ref.stream():
+            data = doc.to_dict()
+            # Normalize keys to match CLI format
+            data["id"] = data.get("id") or int(datetime.now().timestamp() * 1000)
+            cloud_memories.append(data)
 
-        # Basic check to avoid re-uploading everything every time
-        # In a robust system, we'd check IDs. For now, we trust the CLI archive is the source of truth.
-        # But writing 1000s of docs is expensive.
-        # Strategy: Only sync if we detect new items (by count or timestamp).
-        # For this MVP, we will skip the heavy sync on every turn and rely on the
-        # fact that the bot can read the local file directly for RAG.
-        # We only push to Firestore for backup/web visibility.
-        pass
+        # 3. Merge Logic
+        updates_to_local = []
+        updates_to_cloud = []
+
+        # Check what's missing in local
+        for cm in cloud_memories:
+            h = get_mem_hash(cm)
+            if h not in local_map:
+                updates_to_local.append(cm)
+                local_map[h] = cm  # Update map to avoid dupes later
+
+        # Check what's missing in cloud
+        cloud_hashes = {get_mem_hash(cm) for cm in cloud_memories}
+        for lm in local_memories:
+            h = get_mem_hash(lm)
+            if h not in cloud_hashes:
+                updates_to_cloud.append(lm)
+
+        # 4. Apply Updates
+
+        # Write to Local
+        if updates_to_local:
+            final_list = list(local_map.values())
+            # Sort by timestamp descending
+            final_list.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+
+            with open(ARCHIVE_FILE, "w", encoding="utf-8") as f:
+                json.dump(final_list, f, indent=2, ensure_ascii=False)
+
+            # Re-index embeddings for new items
+            for item in updates_to_local:
+                vector = mimi_embeddings.get_embedding(item.get("content"))
+                if vector:
+                    vectors = mimi_embeddings.load_vectors()
+                    vectors[str(item.get("id"))] = vector
+                    mimi_embeddings.save_vectors(vectors)
+
+            logger.info(
+                f" synced {len(updates_to_local)} memories from Cloud -> Local."
+            )
+
+        # Write to Cloud
+        if updates_to_cloud:
+            batch = firebase_db.db.batch()
+            count = 0
+            for item in updates_to_cloud:
+                doc_ref = user_mem_ref.document(str(item.get("id")))
+                batch.set(doc_ref, item)
+                count += 1
+                if count >= 400:  # Firestore batch limit safety
+                    batch.commit()
+                    batch = firebase_db.db.batch()
+                    count = 0
+            if count > 0:
+                batch.commit()
+
+            logger.info(
+                f" synced {len(updates_to_cloud)} memories from Local -> Cloud."
+            )
 
     except Exception as e:
         logger.error(f"Memory sync failed: {e}")

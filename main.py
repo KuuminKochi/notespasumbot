@@ -23,6 +23,7 @@ from utils import (
     commands,
     announcer,
     admin_manager,
+    sync_cmd,
 )
 import os
 
@@ -57,6 +58,7 @@ app.add_handler(CommandHandler("reset", commands.soft_reset))
 app.add_handler(CommandHandler("announce", announcer.announce))
 app.add_handler(CommandHandler("addadmin", admin_manager.add_admin))
 app.add_handler(CommandHandler("removeadmin", admin_manager.remove_admin))
+app.add_handler(CommandHandler("sync", sync_cmd.sync))
 
 # --- Matching & Admin Handlers ---
 app.add_handler(

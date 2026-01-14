@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 BASE_URL = "https://openrouter.ai/api/v1"
-CHAT_MODEL = "deepseek/deepseek-r1"  # User requested deepseek-reasoner, mapping to likely OpenRouter ID or using deepseek/deepseek-r1
+CHAT_MODEL = "deepseek/deepseek-chat"  # Switched to V3 for stability
 KL_TZ = pytz.timezone("Asia/Kuala_Lumpur")
 
 TOOLS_SCHEMA = [
