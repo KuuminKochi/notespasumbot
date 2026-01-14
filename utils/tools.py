@@ -13,13 +13,23 @@ logger = logging.getLogger(__name__)
 
 def web_search(query: str) -> str:
     try:
-        results = list(DDGS().text(query, max_results=3))
+        logger.info(f"Searching for: {query}")
+        results = list(DDGS().text(query, max_results=5))
         if not results:
+            logger.warning(f"No results found for: {query}")
             return "No results found."
-        return "\n\n".join(
-            [f"[{r['title']}]({r['href']})\n{r['body']}" for r in results]
-        )
+
+        output = []
+        for r in results:
+            title = r.get("title", "No Title")
+            href = r.get("href", "#")
+            body = r.get("body", "No Content")
+            logger.info(f"Found: {title} ({href})")
+            output.append(f"[{title}]({href})\n{body}")
+
+        return "\n\n".join(output)
     except Exception as e:
+        logger.error(f"Search error for '{query}': {e}")
         return f"Search error: {e}"
 
 

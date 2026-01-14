@@ -206,7 +206,7 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
         )
     messages.append({"role": "user", "content": user_message})
 
-    # 2. API Call Loop (Max 1 turn for efficiency)
+    # 2. API Call Loop (Max 2 turns for "Tool -> Tool -> Answer")
     final_response = ""
 
     headers = {
@@ -215,7 +215,7 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
     }
 
     current_turn = 0
-    max_turns = 1
+    max_turns = 2
 
     while current_turn <= max_turns:
         payload = {
@@ -357,7 +357,7 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
                 {
                     "role": "assistant",
                     "content": buffer if buffer else None,
-                    "reasoning_content": thinking_buffer if thinking_buffer else None,
+                    "reasoning_content": thinking_buffer if thinking_buffer else "",
                     "tool_calls": tool_calls,
                 }
             )
@@ -403,4 +403,6 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
             telegram_id, "assistant", cleaned, chat_id=target_chat_id
         )
     else:
-        await status_msg.edit_text("...")
+        # Fallback if model output nothing (e.g. only reasoning or tool loop exhaustion)
+        fallback = "🤔 (I pondered this deeply but found no words. Ask me to clarify?)"
+        await status_msg.edit_text(fallback)
