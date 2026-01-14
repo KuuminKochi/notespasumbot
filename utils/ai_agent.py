@@ -156,19 +156,25 @@ def build_system_prompt(user_name, telegram_id, chat_type="private"):
 
 
 async def execute_tool(name, args, user_id=None):
+    # Wrap synchronous tool calls in asyncio.to_thread to prevent blocking the event loop
     if name == "web_search":
-        return tools.web_search(args.get("query"))
+        return await asyncio.to_thread(tools.web_search, args.get("query"))
     elif name == "web_batch_search":
-        return tools.web_batch_search(args.get("queries"))
+        return await asyncio.to_thread(tools.web_batch_search, args.get("queries"))
     elif name == "web_fetch":
-        return tools.web_fetch(args.get("url"))
+        return await asyncio.to_thread(tools.web_fetch, args.get("url"))
     elif name == "web_batch_fetch":
-        return tools.web_batch_fetch(args.get("urls"))
+        return await asyncio.to_thread(tools.web_batch_fetch, args.get("urls"))
     elif name == "perform_memory_search":
-        return tools.perform_memory_search(args.get("query"), user_id)
+        return await asyncio.to_thread(
+            tools.perform_memory_search, args.get("query"), user_id
+        )
     elif name == "add_memory":
-        return tools.execute_add_memory(
-            args.get("content"), user_id, args.get("category", "User")
+        return await asyncio.to_thread(
+            tools.execute_add_memory,
+            args.get("content"),
+            user_id,
+            args.get("category", "User"),
         )
     return "Error: Unknown tool."
 
@@ -278,11 +284,12 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
                                     is_thinking = False
                                     await status_msg.edit_text("💡")
 
+                                buffer += content
+
                                 # If tool call starts, we stop showing text to prevent leakage
                                 if is_tool_streaming:
                                     continue
 
-                                buffer += content
                                 # Update UI for content
                                 now = asyncio.get_event_loop().time()
                                 if now - last_ui_update > 1.5:
