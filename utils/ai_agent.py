@@ -80,10 +80,10 @@ def build_system_prompt(user_name):
 
     constraints = (
         "CONSTRAINTS:\n"
-        "1. NO LINKS: Never output URLs.\n"
-        "2. FORMAT: Strictly one paragraph. Write in a calm, narrative, novel-like style.\n"
-        "3. TONE: Grounded, introspective, and observant. Avoid ecstatic or hyper-energetic language.\n"
-        "4. HTML: Use <b>, <i>, <code> only.\n"
+        "1. PLAIN TEXT ONLY: No markdown, no HTML, no bold, no italics, no code blocks.\n"
+        "2. NO EMOJIS: Absolutely zero emojis.\n"
+        "3. FORMAT: Strictly one short paragraph of pure dialogue/prose. No lists or bullet points.\n"
+        "4. TONE: Calm, minimalist, and grounded. Write like a character in a novel, not a chatbot.\n"
     )
 
     return (
@@ -305,8 +305,8 @@ async def stream_ai_response(update, context, status_msg, user_message):
 
     cleaned = ai_tutor.clean_output(final_response)
 
-    if cleaned:
-        await status_msg.edit_text(cleaned, parse_mode="HTML")
+        if cleaned:
+            await status_msg.edit_text(cleaned)
         # Log
         firebase_db.prune_conversation(telegram_id)
         firebase_db.log_conversation(telegram_id, "user", user_message)
