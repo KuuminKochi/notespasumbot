@@ -230,9 +230,9 @@ async def stream_ai_response(update, context, status_msg, user_message):
                                 # Update UI for content
                                 now = asyncio.get_event_loop().time()
                                 if now - last_ui_update > 1.5:
-                                    clean = tools.memory_sync.mimi_embeddings.os.path.basename  # access clean_output? no, need to import it
+                                    clean = ai_tutor.clean_output(buffer, escape=False)
                                     # Just basic cleaning for stream
-                                    await status_msg.edit_text(buffer + "▌")
+                                    await status_msg.edit_text(clean + "▌")
                                     last_ui_update = now
 
                             # Tools
@@ -324,7 +324,7 @@ async def stream_ai_response(update, context, status_msg, user_message):
     # Final Cleanup
     from utils import ai_tutor  # reuse clean_output
 
-    cleaned = ai_tutor.clean_output(final_response)
+    cleaned = ai_tutor.clean_output(final_response, escape=False)
 
     if cleaned:
         await status_msg.edit_text(cleaned)

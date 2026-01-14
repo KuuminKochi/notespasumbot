@@ -53,7 +53,7 @@ def build_system_prompt(user_name="Student"):
     return f"{no_links}\n{time_context}\n\n{global_rules}\n\n{persona}\n\n{format_note}"
 
 
-def clean_output(text):
+def clean_output(text, escape=True):
     patterns = [
         (r"https?://\S+", "[Link Removed]"),
         (r"\[.+?\]\(.+?\)", "[Link Removed]"),
@@ -65,7 +65,10 @@ def clean_output(text):
     ]
     for pattern, replacement in patterns:
         text = re.sub(pattern, replacement, text)
-    return escape_html(text).strip()
+
+    if escape:
+        return escape_html(text).strip()
+    return text.strip()
 
 
 def escape_html(text):
