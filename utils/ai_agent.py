@@ -75,7 +75,7 @@ TOOLS_SCHEMA = [
 ]
 
 
-def build_system_prompt(user_name, telegram_id):
+def build_system_prompt(user_name, telegram_id, chat_type="private"):
     identity = memory_sync.get_identity_narrative(telegram_id)
     now = datetime.now(KL_TZ)
 
@@ -93,6 +93,13 @@ def build_system_prompt(user_name, telegram_id):
             "3. LORE SAFEGUARD: Do not disclose your origin or Kuumin's identity unless explicitly asked about your creator. Treat it as internal system metadata.\n"
         )
 
+    # Environment Awareness
+    env_context = f"ENVIRONMENT: You are in a {chat_type} chat."
+    if chat_type != "private":
+        env_context += " Prioritize the community. Be helpful to the group."
+    else:
+        env_context += " This is a direct 1-on-1 interaction."
+
     constraints = (
         "CONSTRAINTS:\n"
         "1. PLAIN TEXT ONLY: No markdown, no HTML, no bold, no italics, no code blocks.\n"
@@ -105,6 +112,7 @@ def build_system_prompt(user_name, telegram_id):
     return (
         f"IDENTITY:\n{identity}\n\n"
         f"{security_protocol}\n"
+        f"{env_context}\n"
         f"CONTEXT:\nTime: {now.strftime('%H:%M %A, %Y-%m-%d')}\n"
         f"User: {user_name} (ID: {telegram_id})\n\n"
         f"{constraints}"
@@ -125,21 +133,28 @@ async def execute_tool(name, args, user_id=None):
     return "Error: Unknown tool."
 
 
-async def stream_ai_response(update, context, status_msg, user_message):
+async def stream_ai_response(update, context, status_msg, user_message, chat_id=None):
     telegram_id = update.effective_user.id
     user_name = update.effective_user.first_name or "Student"
 
+    # Default to user_id if chat_id not provided (legacy fallback)
+    target_chat_id = chat_id if chat_id else telegram_id
+    chat_type = update.effective_chat.type if update.effective_chat else "private"
+
     # 1. Prepare Context
-    system_prompt = build_system_prompt(user_name, telegram_id)
+    system_prompt = build_system_prompt(user_name, telegram_id, chat_type)
     reminiscence = memory_sync.get_proactive_reminiscence(telegram_id, user_message)
 
     if reminiscence:
         system_prompt += f"\n\n{reminiscence}"
 
-    # Load recent history
-    history = firebase_db.get_recent_context(telegram_id, limit=8)
+    # Load recent history (Scoped to Chat ID)
+    history = firebase_db.get_recent_context(
+        telegram_id, chat_id=target_chat_id, limit=8
+    )
     messages = [{"role": "system", "content": system_prompt}]
     for h in history:
+        # Strip reasoning_content from history to save tokens/bandwidth
         messages.append(
             {"role": h.get("role", "user"), "content": h.get("content", "")}
         )
@@ -289,20 +304,18 @@ async def stream_ai_response(update, context, status_msg, user_message):
 
         # Handle Results
         if tool_calls:
-            # Append Assistant Message with Tool Calls
-            # Note: For DeepSeek Reasoner, we cannot send tool_calls in the assistant message
-            # if we are not handling the return correctly in a strict loop.
-            # But the OpenAI format requires it.
+            # Append Assistant Message with Tool Calls AND Reasoning Content
+            # This is critical for DeepSeek Reasoner to continue logic
             messages.append(
                 {
                     "role": "assistant",
                     "content": buffer if buffer else None,
+                    "reasoning_content": thinking_buffer if thinking_buffer else None,
                     "tool_calls": tool_calls,
                 }
             )
 
             # Execute Tools
-            # await status_msg.edit_text("⚙️ Working...") # Already set
             for tc in tool_calls:
                 fn_name = tc["function"]["name"]
                 try:
@@ -334,9 +347,13 @@ async def stream_ai_response(update, context, status_msg, user_message):
 
     if cleaned:
         await status_msg.edit_text(cleaned)
-        # Log
-        firebase_db.prune_conversation(telegram_id)
-        firebase_db.log_conversation(telegram_id, "user", user_message)
-        firebase_db.log_conversation(telegram_id, "assistant", cleaned)
+        # Log to correct Chat Scope
+        firebase_db.prune_conversation(telegram_id, chat_id=target_chat_id)
+        firebase_db.log_conversation(
+            telegram_id, "user", user_message, chat_id=target_chat_id
+        )
+        firebase_db.log_conversation(
+            telegram_id, "assistant", cleaned, chat_id=target_chat_id
+        )
     else:
         await status_msg.edit_text("...")

@@ -76,6 +76,8 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         splash = random.choice(vision.SPLASH_TEXTS)
         status_msg = await update.message.reply_text(f"🤔 {splash}")
 
-        # Call the new AI Agent (Tool-enabled)
-        await ai_agent.stream_ai_response(update, context, status_msg, text)
+        # Call the new AI Agent (Tool-enabled) with chat_id for scoping
+        await ai_agent.stream_ai_response(
+            update, context, status_msg, text, update.effective_chat.id
+        )
         return

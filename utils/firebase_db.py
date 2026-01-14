@@ -39,23 +39,34 @@ def create_or_update_user(telegram_id, user_data):
     doc_ref.set(user_data, merge=True)
 
 
-def log_conversation(telegram_id, role, content):
+def log_conversation(telegram_id, role, content, chat_id=None):
     if not db:
         return
-    user_ref = db.collection("users").document(str(telegram_id))
-    msg_data = {"role": role, "content": content, "timestamp": datetime.datetime.now()}
-    user_ref.collection("conversations").add(msg_data)
+    # Use chat_id as the primary scope if provided, otherwise default to telegram_id (for legacy/DMs)
+    target_id = str(chat_id) if chat_id else str(telegram_id)
+
+    # Store in a "chats" collection to isolate environments
+    chat_ref = db.collection("chats").document(target_id)
+    msg_data = {
+        "role": role,
+        "content": content,
+        "timestamp": datetime.datetime.now(),
+        "user_id": str(telegram_id),
+    }
+    chat_ref.collection("messages").add(msg_data)
     print(
-        f"DEBUG: Firestore: Saving {role} message ({len(content)} chars) for user {telegram_id}"
+        f"DEBUG: Firestore: Saving {role} message ({len(content)} chars) for chat {target_id}"
     )
 
 
-def prune_conversation(telegram_id, max_messages=50, delete_count=25):
+def prune_conversation(telegram_id, chat_id=None, max_messages=50, delete_count=25):
     """Prune oldest messages when conversation exceeds max_messages."""
     if not db:
         return
-    user_ref = db.collection("users").document(str(telegram_id))
-    conv_ref = user_ref.collection("conversations")
+
+    target_id = str(chat_id) if chat_id else str(telegram_id)
+    chat_ref = db.collection("chats").document(target_id)
+    conv_ref = chat_ref.collection("messages")
 
     total = len(list(conv_ref.stream()))
     if total <= max_messages:
@@ -68,26 +79,32 @@ def prune_conversation(telegram_id, max_messages=50, delete_count=25):
         count += 1
 
 
-def get_recent_context(telegram_id, limit=5):
+def get_recent_context(telegram_id, chat_id=None, limit=5):
     """
     Retrieves the last N messages (Sliding Window: 5 messages).
     """
     if not db:
         return []
-    user_ref = db.collection("users").document(str(telegram_id))
+
+    target_id = str(chat_id) if chat_id else str(telegram_id)
+    chat_ref = db.collection("chats").document(target_id)
+
     docs = (
-        user_ref.collection("conversations")
+        chat_ref.collection("messages")
         .order_by("timestamp", direction=firestore.Query.DESCENDING)
         .limit(limit)
         .stream()
     )
     messages = []
     for doc in docs:
-        messages.append(doc.to_dict())
+        data = doc.to_dict()
+        # Clean internal fields before returning to context
+        messages.append({"role": data.get("role"), "content": data.get("content")})
+
     result = messages[::-1]
     total_chars = sum(len(m.get("content", "")) for m in result)
     print(
-        f"DEBUG: Firestore: Retrieved {len(result)} messages ({total_chars} chars) for user {telegram_id}"
+        f"DEBUG: Firestore: Retrieved {len(result)} messages ({total_chars} chars) for chat {target_id}"
     )
     return result
 
