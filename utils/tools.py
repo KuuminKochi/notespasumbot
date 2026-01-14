@@ -66,11 +66,11 @@ def web_fetch(url: str) -> str:
         return f"Fetch Error: {e}"
 
 
-def perform_memory_search(query: str) -> str:
+def perform_memory_search(query: str, user_id: int) -> str:
     """Explicit semantic search."""
     # We can reuse the proactive logic but maybe with more results
     try:
-        results = memory_sync.get_proactive_reminiscence(query)
+        results = memory_sync.get_proactive_reminiscence(user_id, query)
         if not results:
             return "No relevant long-term memories found."
         return results
@@ -78,6 +78,6 @@ def perform_memory_search(query: str) -> str:
         return f"Memory Search Error: {e}"
 
 
-def execute_add_memory(content: str, category: str = "Mimi") -> str:
+def execute_add_memory(content: str, user_id: int, category: str = "Mimi") -> str:
     """Bridge to the validator."""
-    return validator.process_add_memory(content, category)
+    return validator.process_add_memory(content, user_id, category)

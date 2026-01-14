@@ -63,7 +63,7 @@ def validate_memory(content: str) -> str:
         return f"REJECTED: {e}"
 
 
-def process_add_memory(content: str, category: str = "Mimi") -> str:
+def process_add_memory(content: str, user_id: int, category: str = "Mimi") -> str:
     """
     Pipeline: Validate -> Save
     """
@@ -73,7 +73,7 @@ def process_add_memory(content: str, category: str = "Mimi") -> str:
         return f"❌ Memory rejected by validator: {validation_result.split(':', 1)[1]}"
 
     # Save the refined memory
-    success = memory_sync.add_memory_to_archive(validation_result, category)
+    success = memory_sync.add_memory_to_archive(user_id, validation_result, category)
     if success:
         return f"✅ Memory saved: {validation_result}"
     else:

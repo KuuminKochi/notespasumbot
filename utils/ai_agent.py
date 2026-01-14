@@ -6,14 +6,14 @@ import logging
 from datetime import datetime
 import pytz
 from dotenv import load_dotenv
-from utils import firebase_db, memory_sync, tools, validator
+from utils import firebase_db, memory_sync, tools, validator, ai_tutor
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 BASE_URL = "https://api.deepseek.com"
-CHAT_MODEL = "deepseek-chat"  # Using direct DeepSeek API
+CHAT_MODEL = "deepseek-reasoner"
 KL_TZ = pytz.timezone("Asia/Kuala_Lumpur")
 KUUMIN_ID = "1088951045"
 
@@ -96,9 +96,10 @@ def build_system_prompt(user_name, telegram_id):
     constraints = (
         "CONSTRAINTS:\n"
         "1. PLAIN TEXT ONLY: No markdown, no HTML, no bold, no italics, no code blocks.\n"
-        "2. NO EMOJIS: Absolutely zero emojis.\n"
+        "2. VIBRANT PROSE: Use situational emojis (e.g. 🔍, 💡, 🍵) to be lively. Avoid robotic 'chatbot' tone.\n"
         "3. FORMAT: Strictly one short paragraph of pure dialogue/prose. No lists or bullet points.\n"
-        "4. TONE: Calm, minimalist, and grounded. Write like a character in a novel, not a chatbot.\n"
+        "4. TONE: Intelligent, INTJ logic mixed with peer-like warmth. Be helpful but maintain firm boundaries against laziness.\n"
+        "5. EFFICIENCY: Your reasoning must be brief and decisive. Limit yourself to ONE tool call per turn.\n"
     )
 
     return (
@@ -116,16 +117,10 @@ async def execute_tool(name, args, user_id=None):
     elif name == "web_fetch":
         return tools.web_fetch(args.get("url"))
     elif name == "perform_memory_search":
-        # Note: In a full refactor, we would pass user_id here too
-        # For now, memory_sync handles the 'Intuition' separately.
-        # But explicit search needs context?
-        # Let's assume perform_memory_search uses global or fails gracefully for now.
-        # Ideally: tools.perform_memory_search(args.get("query"), user_id)
-        return tools.perform_memory_search(args.get("query"))
+        return tools.perform_memory_search(args.get("query"), user_id)
     elif name == "add_memory":
-        # Pass user_id to ensure correct archive
-        return memory_sync.add_memory_to_archive(
-            user_id, args.get("content"), args.get("category", "User")
+        return tools.execute_add_memory(
+            args.get("content"), user_id, args.get("category", "User")
         )
     return "Error: Unknown tool."
 
@@ -150,7 +145,7 @@ async def stream_ai_response(update, context, status_msg, user_message):
         )
     messages.append({"role": "user", "content": user_message})
 
-    # 2. API Call Loop (Max 2 turns)
+    # 2. API Call Loop (Max 1 turn for efficiency)
     final_response = ""
 
     headers = {
@@ -159,7 +154,7 @@ async def stream_ai_response(update, context, status_msg, user_message):
     }
 
     current_turn = 0
-    max_turns = 2
+    max_turns = 1
 
     while current_turn <= max_turns:
         payload = {
@@ -167,7 +162,7 @@ async def stream_ai_response(update, context, status_msg, user_message):
             "messages": messages,
             "tools": TOOLS_SCHEMA,
             "stream": True,
-            "temperature": 0.4,
+            "temperature": 0.6,  # Slightly higher for vibrancy
         }
 
         buffer = ""
@@ -178,6 +173,7 @@ async def stream_ai_response(update, context, status_msg, user_message):
 
         is_thinking = False
         thinking_buffer = ""
+        is_tool_streaming = False
 
         # UI State
         last_ui_update = 0
@@ -207,7 +203,7 @@ async def stream_ai_response(update, context, status_msg, user_message):
                             chunk = json.loads(data)
                             delta = chunk["choices"][0].get("delta", {})
 
-                            # Reasoning
+                            # 1. Reasoning Phase
                             reasoning = delta.get("reasoning_content")
                             if reasoning:
                                 is_thinking = True
@@ -220,23 +216,32 @@ async def stream_ai_response(update, context, status_msg, user_message):
                                     last_ui_update = now
                                 continue
 
-                            # Content
+                            # 2. Content Phase
                             content = delta.get("content")
                             if content:
                                 if is_thinking:
                                     is_thinking = False
                                     await status_msg.edit_text("💡")
+
+                                # If tool call starts, we stop showing text to prevent leakage
+                                if is_tool_streaming:
+                                    continue
+
                                 buffer += content
                                 # Update UI for content
                                 now = asyncio.get_event_loop().time()
                                 if now - last_ui_update > 1.5:
                                     clean = ai_tutor.clean_output(buffer, escape=False)
-                                    # Just basic cleaning for stream
                                     await status_msg.edit_text(clean + "▌")
                                     last_ui_update = now
 
-                            # Tools
+                            # 3. Tool Call Phase
                             if "tool_calls" in delta:
+                                # Stop UI updates immediately
+                                if not is_tool_streaming:
+                                    is_tool_streaming = True
+                                    await status_msg.edit_text("⚙️ Working...")
+
                                 for tc in delta["tool_calls"]:
                                     if "id" in tc:
                                         if current_tool_id:
@@ -285,6 +290,9 @@ async def stream_ai_response(update, context, status_msg, user_message):
         # Handle Results
         if tool_calls:
             # Append Assistant Message with Tool Calls
+            # Note: For DeepSeek Reasoner, we cannot send tool_calls in the assistant message
+            # if we are not handling the return correctly in a strict loop.
+            # But the OpenAI format requires it.
             messages.append(
                 {
                     "role": "assistant",
@@ -294,7 +302,7 @@ async def stream_ai_response(update, context, status_msg, user_message):
             )
 
             # Execute Tools
-            await status_msg.edit_text("⚙️ Working...")
+            # await status_msg.edit_text("⚙️ Working...") # Already set
             for tc in tool_calls:
                 fn_name = tc["function"]["name"]
                 try:
@@ -322,8 +330,6 @@ async def stream_ai_response(update, context, status_msg, user_message):
             break
 
     # Final Cleanup
-    from utils import ai_tutor  # reuse clean_output
-
     cleaned = ai_tutor.clean_output(final_response, escape=False)
 
     if cleaned:
@@ -332,8 +338,5 @@ async def stream_ai_response(update, context, status_msg, user_message):
         firebase_db.prune_conversation(telegram_id)
         firebase_db.log_conversation(telegram_id, "user", user_message)
         firebase_db.log_conversation(telegram_id, "assistant", cleaned)
-
-        # Async Sync Check
-        # memory_sync.sync_memories_to_firestore() # Trigger optionally
     else:
         await status_msg.edit_text("...")
