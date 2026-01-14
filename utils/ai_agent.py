@@ -305,8 +305,8 @@ async def stream_ai_response(update, context, status_msg, user_message):
 
     cleaned = ai_tutor.clean_output(final_response)
 
-        if cleaned:
-            await status_msg.edit_text(cleaned)
+    if cleaned:
+        await status_msg.edit_text(cleaned)
         # Log
         firebase_db.prune_conversation(telegram_id)
         firebase_db.log_conversation(telegram_id, "user", user_message)
