@@ -272,10 +272,18 @@ def sync_memories_to_firestore():
                     cloud_memories = []
                     for doc in user_mem_ref.stream():
                         data = doc.to_dict()
-                        # Normalize keys to match CLI format
+                        # Normalize keys
                         data["id"] = data.get("id") or int(
                             datetime.now().timestamp() * 1000
                         )
+
+                        # Normalize Timestamp: Convert Datetime objects to String
+                        ts = data.get("timestamp")
+                        if hasattr(ts, "strftime"):
+                            data["timestamp"] = ts.strftime("%Y-%m-%d %H:%M")
+                        elif not isinstance(ts, str):
+                            data["timestamp"] = str(ts)
+
                         cloud_memories.append(data)
 
                     # 3. Merge Logic

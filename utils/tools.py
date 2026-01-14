@@ -20,9 +20,13 @@ def web_search(query: str) -> str:
         # Let's try 'wt-wt' first, but if query contains "Malaysia", switch?
         # Actually, let's keep it simple: generic search first.
 
-        # Adding a retry loop with different backends
-        results = []
-        backends = ["text", "news"]  # Try generic text, then news specifically
+        # Heuristic: If query asks for "news", prioritize 'news' backend
+        if any(
+            k in query.lower() for k in ["news", "latest", "update", "today", "202"]
+        ):
+            backends = ["news", "text"]
+        else:
+            backends = ["text", "news"]
 
         blacklist = [
             "Sign in",
@@ -31,6 +35,8 @@ def web_search(query: str) -> str:
             "Zillow",
             "Facebook - log in",
             "Google",
+            "哔哩哔哩",
+            "知乎",
         ]
 
         for backend in backends:
