@@ -215,7 +215,7 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
     }
 
     current_turn = 0
-    max_turns = 2
+    max_turns = 20
 
     while current_turn <= max_turns:
         payload = {

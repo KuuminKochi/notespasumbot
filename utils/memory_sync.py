@@ -233,3 +233,122 @@ def add_memory_to_archive(user_id: int, content: str, category: str = "User"):
     except Exception as e:
         logger.error(f"Failed to add memory for {user_id}: {e}")
         return False
+
+
+def sync_memories_to_firestore():
+    """
+    Bi-directional sync for ALL user archives in the memories directory.
+    Iterates through all `archive_{user_id}.json` files and syncs them.
+    """
+    if not firebase_db.db:
+        return
+
+    try:
+        if not os.path.exists(MEMORIES_DIR):
+            return
+
+        for filename in os.listdir(MEMORIES_DIR):
+            if filename.startswith("archive_") and filename.endswith(".json"):
+                user_id = filename.replace("archive_", "").replace(".json", "")
+                path = os.path.join(MEMORIES_DIR, filename)
+
+                try:
+                    # 1. Load Local Archive
+                    with open(path, "r", encoding="utf-8") as f:
+                        local_memories = json.load(f)
+
+                    # Helper to hash memories for dedup
+                    def get_mem_hash(m):
+                        return f"{m.get('timestamp')}_{m.get('content')}"
+
+                    local_map = {get_mem_hash(m): m for m in local_memories}
+
+                    # 2. Load Firestore Memories
+                    user_mem_ref = (
+                        firebase_db.db.collection("users")
+                        .document(user_id)
+                        .collection("memories")
+                    )
+                    cloud_memories = []
+                    for doc in user_mem_ref.stream():
+                        data = doc.to_dict()
+                        # Normalize keys to match CLI format
+                        data["id"] = data.get("id") or int(
+                            datetime.now().timestamp() * 1000
+                        )
+                        cloud_memories.append(data)
+
+                    # 3. Merge Logic
+                    updates_to_local = []
+                    updates_to_cloud = []
+
+                    # Check what's missing in local
+                    for cm in cloud_memories:
+                        h = get_mem_hash(cm)
+                        if h not in local_map:
+                            updates_to_local.append(cm)
+                            local_map[h] = cm
+
+                    # Check what's missing in cloud
+                    cloud_hashes = {get_mem_hash(cm) for cm in cloud_memories}
+                    for lm in local_memories:
+                        h = get_mem_hash(lm)
+                        if h not in cloud_hashes:
+                            updates_to_cloud.append(lm)
+
+                    # 4. Apply Updates
+                    # Write to Local
+                    if updates_to_local:
+                        final_list = list(local_map.values())
+                        final_list.sort(
+                            key=lambda x: x.get("timestamp", ""), reverse=True
+                        )
+
+                        with open(path, "w", encoding="utf-8") as f:
+                            json.dump(final_list, f, indent=2, ensure_ascii=False)
+
+                        # Re-index vectors (Simplified: just re-index new items)
+                        vector_path = os.path.join(
+                            MEMORIES_DIR, f"vectors_{user_id}.json"
+                        )
+                        user_vectors = {}
+                        if os.path.exists(vector_path):
+                            with open(vector_path, "r", encoding="utf-8") as f:
+                                user_vectors = json.load(f)
+
+                        for item in updates_to_local:
+                            vec = mimi_embeddings.get_embedding(item.get("content"))
+                            if vec:
+                                user_vectors[str(item.get("id"))] = vec
+
+                        with open(vector_path, "w", encoding="utf-8") as f:
+                            json.dump(user_vectors, f)
+
+                        logger.info(
+                            f"Synced {len(updates_to_local)} memories Cloud -> Local for {user_id}"
+                        )
+
+                    # Write to Cloud
+                    if updates_to_cloud:
+                        batch = firebase_db.db.batch()
+                        count = 0
+                        for item in updates_to_cloud:
+                            doc_ref = user_mem_ref.document(str(item.get("id")))
+                            batch.set(doc_ref, item)
+                            count += 1
+                            if count >= 400:
+                                batch.commit()
+                                batch = firebase_db.db.batch()
+                                count = 0
+                        if count > 0:
+                            batch.commit()
+
+                        logger.info(
+                            f"Synced {len(updates_to_cloud)} memories Local -> Cloud for {user_id}"
+                        )
+
+                except Exception as e:
+                    logger.error(f"Sync error for user {user_id}: {e}")
+
+    except Exception as e:
+        logger.error(f"Global sync failed: {e}")
