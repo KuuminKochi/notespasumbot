@@ -11,9 +11,9 @@ from utils import firebase_db, memory_sync, tools, validator
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-BASE_URL = "https://openrouter.ai/api/v1"
-CHAT_MODEL = "xiaomi/mimo-v2-flash:free"  # Reverted to Mimo as per user request
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+BASE_URL = "https://api.deepseek.com"
+CHAT_MODEL = "deepseek-chat"  # Using direct DeepSeek API
 KL_TZ = pytz.timezone("Asia/Kuala_Lumpur")
 
 TOOLS_SCHEMA = [
@@ -132,10 +132,8 @@ async def stream_ai_response(update, context, status_msg, user_message):
     final_response = ""
 
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://notespasumbot.com",
-        "X-Title": "NotesPASUMBot",
     }
 
     current_turn = 0
