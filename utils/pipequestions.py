@@ -48,13 +48,20 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if is_reply_to_bot or is_mention:
             is_summoned = True
         else:
-            # 7% chance with 5 min cooldown
+            # 25% chance with 30s cooldown
             last_activation = context.chat_data.get("last_mimi_activation", 0)
             now = time.time()
-            if (now - last_activation) > 300: # 5 mins
-                if random.random() < 0.07:
+            roll = random.random()
+            
+            if (now - last_activation) > 30: # 30s
+                if roll < 0.25:
+                    print(f"DEBUG: [ROLL] Success! ({roll:.2f} < 0.25) in chat {chat_id}")
                     is_summoned = True
                     context.chat_data["last_mimi_activation"] = now
+                else:
+                    print(f"DEBUG: [ROLL] Failed ({roll:.2f} > 0.25) in chat {chat_id}")
+            else:
+                print(f"DEBUG: [ROLL] Blocked by Cooldown ({int(now - last_activation)}s passed) in chat {chat_id}")
     elif chat_type == "private":
         is_summoned = True
     else:
@@ -96,9 +103,10 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 5. Text Streaming
-    if text:
-        if len(text) < 2:
-            return
+    if text or update.message.caption:
+        # For interjections, we are more lenient with length
+        if not is_mention and not is_reply_to_bot and not text:
+             return
         await context.bot.send_chat_action(
             chat_id=update.effective_chat.id, action=ChatAction.TYPING
         )

@@ -6,6 +6,7 @@ from telegram.ext import (
     filters,
     ContextTypes,
     ConversationHandler,
+    PicklePersistence,
 )
 from dotenv import load_dotenv
 from utils import (
@@ -36,7 +37,8 @@ ADMIN_NOTES = int(os.getenv("ADMIN_NOTES", 0))
 if not API_KEY:
     raise ValueError("API_KEY not found in environment variables")
 
-app = Application.builder().token(API_KEY).build()
+persistence = PicklePersistence(filepath="bot_persistence.pickle")
+app = Application.builder().token(API_KEY).persistence(persistence).build()
 
 # --- AI Tutoring Handlers ---
 app.add_handler(
