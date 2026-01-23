@@ -182,7 +182,7 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
     }
 
     current_turn = 0
-    max_turns = 3  # Strict Limit: 3 turns max
+    max_turns = 5  # Increased Limit: 5 turns for deeper research
     search_count = 0
     
     # Start with FAST model for conversation/routing

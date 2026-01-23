@@ -89,17 +89,26 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 4. Vision Priority
     target_photo = update.message.photo
-    if not target_photo and update.message.reply_to_message:
+    target_doc = update.message.document
+    
+    if not target_photo and not target_doc and update.message.reply_to_message:
         target_photo = update.message.reply_to_message.photo
+        target_doc = update.message.reply_to_message.document
+
+    if target_doc and target_doc.mime_type == "application/pdf":
+        context.user_data["processing_pdf"] = True
+        await vision.process_pdf_question(update, context)
+        return
 
     if target_photo:
         context.user_data["processing_image"] = True
         await vision.process_image_question(update, context)
         return
 
-    # 4b. Skip if image processing flag is set (prevents duplicate handling)
-    if context.user_data.get("processing_image"):
+    # 4b. Skip if media processing flag is set (prevents duplicate handling)
+    if context.user_data.get("processing_image") or context.user_data.get("processing_pdf"):
         context.user_data["processing_image"] = False
+        context.user_data["processing_pdf"] = False
         return
 
     # 5. Text Streaming

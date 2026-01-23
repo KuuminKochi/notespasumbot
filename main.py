@@ -45,6 +45,7 @@ app.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, pipequestions.pipe_question)
 )
 app.add_handler(MessageHandler(filters.PHOTO, pipequestions.pipe_question))
+app.add_handler(MessageHandler(filters.Document.PDF, pipequestions.pipe_question))
 
 # --- Command Handlers ---
 app.add_handler(CommandHandler("start", start.start))

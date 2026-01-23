@@ -8,37 +8,66 @@ from telegram import Update
 from telegram.ext import ContextTypes
 import asyncio
 from . import ai_agent
+from . import tools
+import io
+import pypdf
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+# ... (Existing imports and SPLASH_TEXTS)
 
-SPLASH_TEXTS = [
-    "Mimi is sharpening her pencils...",
-    "Checking library archives...",
-    "Mimi is adjusting her hibiscus flower...",
-    "Consulting PASUM scrolls...",
-    "Mimi is having a quick tea break while thinking...",
-    "Optimizing brain cells...",
-    "Scanning cosmic background radiation...",
-    "Mimi is flipping through her notes...",
-    "Analyzing molecular structure of this query...",
-    "Mimi is doing some quick mental math...",
-    "Let me put on my reading glasses...",
-    "Mimi is zooming in on the details...",
-    "Time to activate thinking cap...",
-    "Channeling inner genius...",
-    "Mimi is organizing her thoughts...",
-    "Decoding the visual puzzle...",
-    "Processing with maximum brain power...",
-    "Mimi is cross-referencing her knowledge...",
-    "Bringing analytical focus to bear...",
-    "Mimi is doing a quick visual scan...",
-    "Preparing to unleash insight...",
-    "Mimi is summoning her academic expertise...",
-    "Deep diving into this problem...",
-]
+async def process_pdf_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
 
+    status_msg = await update.message.reply_text(f"📄 {random.choice(SPLASH_TEXTS)}")
+
+    try:
+        doc_obj = update.message.document
+        if not doc_obj and update.message.reply_to_message:
+            doc_obj = update.message.reply_to_message.document
+
+        if not doc_obj or doc_obj.mime_type != "application/pdf":
+            await status_msg.edit_text("❌ No PDF found.")
+            return
+
+        # Download PDF
+        file_info = await doc_obj.get_file()
+        pdf_bytes = await file_info.download_as_bytearray()
+        
+        # Extract Text
+        extracted_text = ""
+        try:
+            reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+            text_parts = []
+            for page in reader.pages:
+                text_parts.append(page.extract_text())
+            extracted_text = "\n".join(text_parts)[:30000] # Limit size
+        except Exception as e:
+            await status_msg.edit_text(f"⚠️ Failed to read PDF: {str(e)}")
+            return
+
+        if not extracted_text.strip():
+             await status_msg.edit_text("⚠️ This PDF appears to be empty or scanned images (I can only read text).")
+             return
+
+        reasoning_prompt = f"""The user shared a PDF document named '{doc_obj.file_name}'.
+        
+Here is the extracted content from the PDF:
+--------------------------------------------------
+{extracted_text}
+--------------------------------------------------
+
+Please help answer their question or summarize this document. Use the content above as your primary source."""
+
+        # Send to AI Agent
+        await ai_agent.stream_ai_response(
+            update, context, status_msg, reasoning_prompt, update.effective_chat.id
+        )
+
+    except Exception as e:
+         await status_msg.edit_text(f"⚠️ PDF Error: {str(e)}")
 
 async def process_image_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ... (rest of the file)
     if not update.message:
         return
 
