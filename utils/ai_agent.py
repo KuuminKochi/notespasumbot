@@ -87,10 +87,11 @@ TOOLS_SCHEMA = [
 
 
 def build_system_prompt(user_name, telegram_id, chat_type="private"):
-    # Load from the updated markdown file if possible, else fallback
-    # The file prompts/system_prompt.md is the source of truth now.
+    # Select prompt based on chat type
+    prompt_file = "prompts/system_prompt_private.md" if chat_type == "private" else "prompts/system_prompt_group.md"
+    
     try:
-        with open("prompts/system_prompt.md", "r") as f:
+        with open(prompt_file, "r") as f:
             base_prompt = f.read()
     except:
         base_prompt = "You are Mimi, a helpful tutor."
