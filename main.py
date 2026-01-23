@@ -38,7 +38,7 @@ if not API_KEY:
     raise ValueError("API_KEY not found in environment variables")
 
 persistence = PicklePersistence(filepath="bot_persistence.pickle")
-app = Application.builder().token(API_KEY).persistence(persistence).build()
+app = Application.builder().token(API_KEY).persistence(persistence).read_timeout(100).write_timeout(100).connect_timeout(60).build()
 
 # --- AI Tutoring Handlers ---
 app.add_handler(
