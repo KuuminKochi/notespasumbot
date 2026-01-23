@@ -150,15 +150,23 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
 
     # Load recent history
     history = firebase_db.get_recent_context(
-        telegram_id, chat_id=target_chat_id, limit=8
+        telegram_id, chat_id=target_chat_id, limit=10
     )
     messages = [{"role": "system", "content": system_prompt}]
     for h in history:
-        # Clean history
+        role = h.get("role", "user")
+        name = h.get("user_name")
+        content = h.get("content", "")
+        
+        if role == "user" and name:
+            formatted_content = f"[{name}]: {content}"
+        else:
+            formatted_content = content
+
         messages.append(
-            {"role": h.get("role", "user"), "content": h.get("content", "")}
+            {"role": role, "content": formatted_content}
         )
-    messages.append({"role": "user", "content": user_message})
+    messages.append({"role": "user", "content": f"[{user_name}]: {user_message}"})
 
     # 2. API Call Loop
     final_response = ""
@@ -353,10 +361,10 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
         # Log to correct Chat Scope
         firebase_db.prune_conversation(telegram_id, chat_id=target_chat_id)
         firebase_db.log_conversation(
-            telegram_id, "user", user_message, chat_id=target_chat_id
+            telegram_id, "user", user_message, chat_id=target_chat_id, user_name=user_name
         )
         firebase_db.log_conversation(
-            telegram_id, "assistant", cleaned, chat_id=target_chat_id
+            telegram_id, "assistant", cleaned, chat_id=target_chat_id, user_name="Mimi"
         )
     else:
         fallback = "🤔 (I pondered this deeply but found no words. Ask me to clarify?)"

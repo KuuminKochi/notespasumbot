@@ -39,7 +39,7 @@ def create_or_update_user(telegram_id, user_data):
     doc_ref.set(user_data, merge=True)
 
 
-def log_conversation(telegram_id, role, content, chat_id=None):
+def log_conversation(telegram_id, role, content, chat_id=None, user_name=None):
     if not db:
         return
     # Use chat_id as the primary scope if provided, otherwise default to telegram_id (for legacy/DMs)
@@ -52,6 +52,7 @@ def log_conversation(telegram_id, role, content, chat_id=None):
         "content": content,
         "timestamp": datetime.datetime.now(),
         "user_id": str(telegram_id),
+        "user_name": user_name,
     }
     chat_ref.collection("messages").add(msg_data)
     print(
@@ -99,7 +100,11 @@ def get_recent_context(telegram_id, chat_id=None, limit=5):
     for doc in docs:
         data = doc.to_dict()
         # Clean internal fields before returning to context
-        messages.append({"role": data.get("role"), "content": data.get("content")})
+        messages.append({
+            "role": data.get("role"),
+            "content": data.get("content"),
+            "user_name": data.get("user_name")
+        })
 
     result = messages[::-1]
     total_chars = sum(len(m.get("content", "")) for m in result)
