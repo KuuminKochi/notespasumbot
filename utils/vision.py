@@ -12,7 +12,33 @@ from . import tools
 import io
 import pypdf
 
-# ... (Existing imports and SPLASH_TEXTS)
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+SPLASH_TEXTS = [
+    "Mimi is sharpening her pencils...",
+    "Checking library archives...",
+    "Mimi is adjusting her hibiscus flower...",
+    "Consulting PASUM scrolls...",
+    "Mimi is having a quick tea break while thinking...",
+    "Optimizing brain cells...",
+    "Scanning cosmic background radiation...",
+    "Mimi is flipping through her notes...",
+    "Analyzing molecular structure of this query...",
+    "Mimi is doing some quick mental math...",
+    "Let me put on my reading glasses...",
+    "Mimi is zooming in on the details...",
+    "Time to activate thinking cap...",
+    "Channeling inner genius...",
+    "Mimi is organizing her thoughts...",
+    "Decoding the visual puzzle...",
+    "Processing with maximum brain power...",
+    "Mimi is cross-referencing her knowledge...",
+    "Bringing analytical focus to bear...",
+    "Mimi is doing a quick visual scan...",
+    "Preparing to unleash insight...",
+    "Mimi is summoning her academic expertise...",
+    "Deep diving into this problem...",
+]
 
 async def process_pdf_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
@@ -67,7 +93,6 @@ Please help answer their question or summarize this document. Use the content ab
          await status_msg.edit_text(f"⚠️ PDF Error: {str(e)}")
 
 async def process_image_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
-# ... (rest of the file)
     if not update.message:
         return
 
