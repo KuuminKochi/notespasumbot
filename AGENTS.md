@@ -136,3 +136,25 @@ Required in `.env`:
 
 ---
 *Updated on 2026-01-14 by opencode.*
+
+## 9. AI Agent Architecture (v2026.1)
+
+### Intelligent Routing
+*   **Conversational First**: All interactions start with  (V3) for instant response and tool decision-making.
+*   **Intense Thinking Later**: If tools are used (e.g. Web Search), the subsequent turn switches to  (R1) to analyze the gathered data with Chain-of-Thought reasoning.
+
+### Performance Constraints
+*   **Max Turns**: 3 turns total per user query.
+*   **Search Limit**: Max 1 web search per query.
+*   **Memory Tools**: Disabled to reduce overhead.
+
+## 9. AI Agent Architecture (v2026.1)
+
+### Intelligent Routing
+*   **Conversational First**: All interactions start with `deepseek-chat` (V3) for instant response and tool decision-making.
+*   **Intense Thinking Later**: If tools are used (e.g. Web Search), the subsequent turn switches to `deepseek-reasoner` (R1) to analyze the gathered data with Chain-of-Thought reasoning.
+
+### Performance Constraints
+*   **Max Turns**: 3 turns total per user query.
+*   **Search Limit**: Max 1 web search per query.
+*   **Memory Tools**: Disabled to reduce overhead.
