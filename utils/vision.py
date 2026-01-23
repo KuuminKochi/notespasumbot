@@ -7,7 +7,7 @@ import random
 from telegram import Update
 from telegram.ext import ContextTypes
 import asyncio
-from . import ai_tutor
+from . import ai_agent
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
@@ -106,7 +106,9 @@ Please help answer their question. Remember the conversation context above - use
         print(
             f"DEBUG: Vision: Nemotron transcription ({len(extracted_text)} chars): {extracted_text[:100]}..."
         )
-        await ai_tutor.stream_ai_response(update, context, status_msg, reasoning_prompt)
+        await ai_agent.stream_ai_response(
+            update, context, status_msg, reasoning_prompt, update.effective_chat.id
+        )
 
     except Exception as e:
         try:
