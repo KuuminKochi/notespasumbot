@@ -103,7 +103,8 @@ def get_recent_context(telegram_id, chat_id=None, limit=5):
         messages.append({
             "role": data.get("role"),
             "content": data.get("content"),
-            "user_name": data.get("user_name")
+            "user_name": data.get("user_name"),
+            "user_id": data.get("user_id")
         })
 
     result = messages[::-1]
