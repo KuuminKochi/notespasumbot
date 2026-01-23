@@ -48,18 +48,18 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if is_reply_to_bot or is_mention:
             is_summoned = True
         else:
-            # 15% chance with 30s cooldown
+            # 7% chance with 30s cooldown
             last_activation = context.chat_data.get("last_mimi_activation", 0)
             now = time.time()
             roll = random.random()
             
             if (now - last_activation) > 30: # 30s
-                if roll < 0.15:
-                    print(f"DEBUG: [ROLL] Success! ({roll:.2f} < 0.15) in chat {chat_id}")
+                if roll < 0.07:
+                    print(f"DEBUG: [ROLL] Success! ({roll:.2f} < 0.07) in chat {chat_id}")
                     is_summoned = True
                     context.chat_data["last_mimi_activation"] = now
                 else:
-                    print(f"DEBUG: [ROLL] Failed ({roll:.2f} > 0.15) in chat {chat_id}")
+                    print(f"DEBUG: [ROLL] Failed ({roll:.2f} > 0.07) in chat {chat_id}")
             else:
                 print(f"DEBUG: [ROLL] Blocked by Cooldown ({int(now - last_activation)}s passed) in chat {chat_id}")
     elif chat_type == "private":
