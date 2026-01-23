@@ -22,6 +22,11 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = user.first_name or "Student"
     chat_id = update.effective_chat.id
 
+    # Initialize trigger flags
+    is_mention = False
+    is_reply_to_bot = False
+    is_summoned = False
+
     # 1. Background Logging (Always listen in groups)
     if chat_type in ["group", "supergroup"] and text:
         loop = asyncio.get_running_loop()
@@ -36,7 +41,6 @@ async def pipe_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     # 2. Trigger Check
-    is_summoned = False
     if chat_type in ["group", "supergroup"]:
         is_reply_to_bot = (
             update.message.reply_to_message
