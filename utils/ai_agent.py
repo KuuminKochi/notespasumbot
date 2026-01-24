@@ -399,6 +399,14 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
     if reminiscence:
         system_prompt += f"\n\n{reminiscence}"
 
+    system_prompt += (
+        "\n\n=== FINAL FORMATTING CHECK ===\n"
+        "Your output MUST be valid HTML. Markdown is strictly FORBIDDEN.\n"
+        "CORRECT: <i>actions</i>, <b>bold</b>, <code>code</code>\n"
+        "WRONG: *actions*, **bold**, `code`\n"
+        "ESCAPE: Use &lt; for < and &gt; for > (e.g. x &lt; 5)."
+    )
+
     # Load recent history (INCREASED TO 20)
     history = firebase_db.get_recent_context(
         telegram_id, chat_id=target_chat_id, limit=20
