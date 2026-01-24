@@ -119,6 +119,13 @@ TOOLS_SCHEMA = [
 
 
 def build_system_prompt(user_name, telegram_id, chat_type="private"):
+    # Load Global Grounding
+    try:
+        with open("prompts/global_grounding.md", "r") as f:
+            global_grounding = f.read()
+    except:
+        global_grounding = ""
+
     # Select prompt based on chat type
     prompt_file = (
         "prompts/system_prompt_private.md"
@@ -155,7 +162,7 @@ def build_system_prompt(user_name, telegram_id, chat_type="private"):
     if chat_type != "private":
         env_context += " Prioritize the community."
 
-    return f"{base_prompt}\n{security_protocol}\n{env_context}"
+    return f"{global_grounding}\n\n{base_prompt}\n{security_protocol}\n{env_context}"
 
 
 import re
@@ -524,7 +531,9 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
                                 if now - last_ui_update > 1.5:
                                     clean = ai_tutor.clean_output(buffer, escape=False)
                                     # Append cursor
-                                    await status_msg.edit_text(clean + "▌", parse_mode="HTML")
+                                    await status_msg.edit_text(
+                                        clean + "▌", parse_mode="HTML"
+                                    )
                                     last_ui_update = now
 
                             # 3. Tool Call Phase
