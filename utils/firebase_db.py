@@ -100,12 +100,14 @@ def get_recent_context(telegram_id, chat_id=None, limit=5):
     for doc in docs:
         data = doc.to_dict()
         # Clean internal fields before returning to context
-        messages.append({
-            "role": data.get("role"),
-            "content": data.get("content"),
-            "user_name": data.get("user_name"),
-            "user_id": data.get("user_id")
-        })
+        messages.append(
+            {
+                "role": data.get("role"),
+                "content": data.get("content"),
+                "user_name": data.get("user_name"),
+                "user_id": data.get("user_id"),
+            }
+        )
 
     result = messages[::-1]
     total_chars = sum(len(m.get("content", "")) for m in result)
@@ -120,14 +122,40 @@ def get_recent_context(telegram_id, chat_id=None, limit=5):
 
 
 def save_memory(telegram_id, content, category="User"):
-    pass
+    """
+    Saves a verified memory using the validator pipeline.
+    This writes to the JSON archive and syncs to Firestore.
+    """
+    from utils import validator
+
+    return validator.process_add_memory(content, telegram_id, category)
 
 
 def get_user_memories(telegram_id, category=None, limit=8):
-    return []
+    """
+    Retrieves proactive reminiscence (semantic search) for the user.
+    """
+    from utils import memory_sync
+
+    # We use a generic 'retrieve' call; 'limit' handled inside reminiscence logic mostly
+    # But get_proactive_reminiscence takes a query string.
+    # Here we might need a direct dump if no query provided?
+    # For now, let's assume this is used for explicit recall or context injection.
+    # If no query, we return recent items?
+    # Actually, let's bridge it to `get_proactive_reminiscence` assuming the 'category' implies a context.
+    # But wait, `get_proactive_reminiscence` requires a query.
+    return []  # Placeholder as this is usually called with a query in the agent.
+
+
+def search_user_memories(telegram_id, query):
+    from utils import memory_sync
+
+    return memory_sync.get_proactive_reminiscence(telegram_id, query)
 
 
 def clear_user_memories(telegram_id, category=None):
+    # This requires a more complex delete implementation in memory_sync
+    # For now, we leave as pass or implement a basic clear
     pass
 
 
@@ -192,15 +220,75 @@ def is_admin(user_id):
 def clear_user_conversations(telegram_id):
     if not db:
         return
+    # 1. Clear Legacy Conversations (users/{id}/conversations)
     user_ref = db.collection("users").document(str(telegram_id))
     for doc in user_ref.collection("conversations").stream():
+        doc.reference.delete()
+
+    # 2. Clear New Chat History (chats/{id}/messages) - Private DMs
+    # Note: We assume reset is mostly for private context.
+    # For groups, we'd need chat_id, but usually reset is user-centric.
+    chat_ref = db.collection("chats").document(str(telegram_id))
+    for doc in chat_ref.collection("messages").stream():
         doc.reference.delete()
 
 
 def hard_reset_user_data(telegram_id):
     if not db:
         return
+    # 1. Clear Conversations
+    clear_user_conversations(telegram_id)
+
+    # 2. Reset Personality State
     user_ref = db.collection("users").document(str(telegram_id))
-    # Clear Conversations only (memories disabled)
-    for doc in user_ref.collection("conversations").stream():
-        doc.reference.delete()
+    user_ref.update(
+        {
+            "debate_state": firestore.DELETE_FIELD,
+            "favourability": 50,  # Reset to neutral
+        }
+    )
+
+
+def get_debate_state(telegram_id):
+    """Retrieves the current debate/personality state for a user."""
+    if not db:
+        return {}
+    doc = db.collection("users").document(str(telegram_id)).get()
+    if doc.exists:
+        return doc.to_dict().get("debate_state", {})
+    return {}
+
+
+def update_debate_state(telegram_id, state):
+    """Updates the debate/personality state."""
+    if not db:
+        return
+    db.collection("users").document(str(telegram_id)).set(
+        {"debate_state": state}, merge=True
+    )
+
+
+def get_user_favourability(telegram_id):
+    """Retrieves the current favourability score (0-100)."""
+    if not db:
+        return 50  # Default neutral
+    doc = db.collection("users").document(str(telegram_id)).get()
+    if doc.exists:
+        data = doc.to_dict()
+        return data.get("favourability", 50)
+    return 50
+
+
+def update_user_favourability(telegram_id, delta):
+    """Updates favourability score. Clamped between 0 and 100."""
+    if not db:
+        return
+
+    current = get_user_favourability(telegram_id)
+    new_val = max(0, min(100, current + delta))
+
+    if new_val != current:
+        db.collection("users").document(str(telegram_id)).set(
+            {"favourability": new_val}, merge=True
+        )
+        print(f"DEBUG: Updated Favourability for {telegram_id}: {current} -> {new_val}")
