@@ -5,10 +5,24 @@ import io
 import pypdf
 import logging
 import concurrent.futures
-from typing import List
-from utils import memory_sync, validator
+from typing import List, Tuple
+from utils import memory_sync, validator, visualizer
 
 logger = logging.getLogger(__name__)
+
+
+def execute_visualize_math(
+    action: str, formula: str, x_range: Tuple[float, float] = (-10, 10)
+) -> str:
+    """
+    Generates a math visualization and returns the local filename.
+    """
+    try:
+        filename = visualizer.visualize_math(action, formula, x_range)
+        return filename
+    except Exception as e:
+        logger.error(f"Visualization error: {e}")
+        return f"Error generating visualization: {e}"
 
 
 def web_search(query: str) -> str:

@@ -7,3 +7,5 @@ duckduckgo-search
 numpy
 beautifulsoup4
 pypdf
+matplotlib
+sympy

@@ -115,6 +115,36 @@ TOOLS_SCHEMA = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "visualize_math",
+            "description": "Generate an image for LaTeX equations or 2D function graphs. Use this for complex math solutions or visual aids.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["render", "plot"],
+                        "description": "'render' for LaTeX text, 'plot' for function graphs.",
+                    },
+                    "formula": {
+                        "type": "string",
+                        "description": "The LaTeX string (for render) or python expression like 'sin(x)' (for plot).",
+                    },
+                    "x_start": {
+                        "type": "number",
+                        "description": "X-axis start (default -10).",
+                    },
+                    "x_end": {
+                        "type": "number",
+                        "description": "X-axis end (default 10).",
+                    },
+                },
+                "required": ["action", "formula"],
+            },
+        },
+    },
 ]
 
 
@@ -379,6 +409,14 @@ async def execute_tool(name, args, user_id=None):
         return await asyncio.to_thread(
             tools.perform_memory_search, args.get("query"), user_id
         )
+    elif name == "visualize_math":
+        x_range = (args.get("x_start", -10), args.get("x_end", 10))
+        return await asyncio.to_thread(
+            tools.execute_visualize_math,
+            args.get("action"),
+            args.get("formula"),
+            x_range,
+        )
     return "Error: Unknown tool or disabled."
 
 
@@ -626,6 +664,35 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
                 try:
                     args = json.loads(tc["function"]["arguments"])
                     result = await execute_tool(fn_name, args, user_id=telegram_id)
+
+                    # Handle visualizer image delivery
+                    if (
+                        fn_name == "visualize_math"
+                        and isinstance(result, str)
+                        and result.endswith(".png")
+                    ):
+                        try:
+                            # Use original status message context for feedback
+                            await status_msg.edit_text(
+                                "🖌️ Sketching complete! Delivering..."
+                            )
+
+                            with open(result, "rb") as photo:
+                                await context.bot.send_photo(
+                                    chat_id=target_chat_id,
+                                    photo=photo,
+                                    caption=f"🎨 Mimi's Sketch",
+                                    reply_to_message_id=update.message.message_id,
+                                )
+
+                            # Cleanup file
+                            from utils import visualizer
+
+                            visualizer.cleanup(result)
+                            result = "Success: Image generated and sent to user."
+                        except Exception as img_err:
+                            result = f"Error delivering image: {img_err}"
+
                 except Exception as e:
                     result = f"Error: {e}"
 
