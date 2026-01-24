@@ -529,11 +529,19 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
                                 # Update UI for content
                                 now = asyncio.get_event_loop().time()
                                 if now - last_ui_update > 1.5:
-                                    clean = ai_tutor.clean_output(buffer, escape=False)
+                                    # Use smart escaping for HTML
+                                    clean = ai_tutor.clean_output(buffer, escape=True)
                                     # Append cursor
-                                    await status_msg.edit_text(
-                                        clean + "▌", parse_mode="HTML"
-                                    )
+                                    try:
+                                        await status_msg.edit_text(
+                                            clean + "▌", parse_mode="HTML"
+                                        )
+                                    except Exception:
+                                        # Fallback to plain text if parsing still fails
+                                        try:
+                                            await status_msg.edit_text(clean + "▌")
+                                        except:
+                                            pass
                                     last_ui_update = now
 
                             # 3. Tool Call Phase
@@ -640,7 +648,7 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
             break
 
     # Final Cleanup
-    cleaned = ai_tutor.clean_output(final_response, escape=False)
+    cleaned = ai_tutor.clean_output(final_response, escape=True)
 
     # Process Bond Tags
     bond_change = 0
@@ -657,7 +665,14 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
     cleaned = cleaned.strip()
 
     if cleaned:
-        await status_msg.edit_text(cleaned, parse_mode="HTML")
+        try:
+            await status_msg.edit_text(cleaned, parse_mode="HTML")
+        except Exception:
+            # Fallback to plain text if parsing still fails
+            try:
+                await status_msg.edit_text(cleaned)
+            except:
+                pass
         # Log to correct Chat Scope
         firebase_db.prune_conversation(telegram_id, chat_id=target_chat_id)
         firebase_db.log_conversation(
@@ -672,4 +687,10 @@ async def stream_ai_response(update, context, status_msg, user_message, chat_id=
         )
     else:
         fallback = "🤔 (I pondered this deeply but found no words. Ask me to clarify?)"
-        await status_msg.edit_text(fallback, parse_mode="HTML")
+        try:
+            await status_msg.edit_text(fallback, parse_mode="HTML")
+        except:
+            try:
+                await status_msg.edit_text(fallback)
+            except:
+                pass

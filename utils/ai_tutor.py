@@ -72,12 +72,48 @@ def clean_output(text, escape=True):
 
 
 def escape_html(text):
-    return (
-        text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-    )
+    """
+    Smart HTML escaping: Escapes stray < and > characters but preserves
+    supported Telegram HTML tags.
+    """
+    valid_tags = [
+        "b",
+        "strong",
+        "i",
+        "em",
+        "u",
+        "ins",
+        "s",
+        "strike",
+        "del",
+        "code",
+        "pre",
+        "blockquote",
+        "tg-spoiler",
+        "a",
+    ]
+    tag_pattern = r"<(/?(" + "|".join(valid_tags) + r")(?:\s+[^>]*)?)>"
+
+    # 1. Escape all & first
+    text = text.replace("&", "&amp;")
+
+    # 2. Protect valid tags using placeholders
+    placeholders = []
+
+    def save_tag(match):
+        placeholders.append(match.group(0))
+        return f"__HTML_TAG_{len(placeholders) - 1}__"
+
+    protected_text = re.sub(tag_pattern, save_tag, text, flags=re.IGNORECASE)
+
+    # 3. Escape remaining stray brackets
+    escaped_text = protected_text.replace("<", "&lt;").replace(">", "&gt;")
+
+    # 4. Restore valid tags
+    for i, tag in enumerate(placeholders):
+        escaped_text = escaped_text.replace(f"__HTML_TAG_{i}__", tag)
+
+    return escaped_text
 
 
 def get_sliding_window_context(telegram_id, limit=10):

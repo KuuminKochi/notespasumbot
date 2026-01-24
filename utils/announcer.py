@@ -114,41 +114,43 @@ async def announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_photo(
                     chat_id=uid,
                     photo=file_id,
-                    caption=final_content,
+                    caption=ai_tutor.escape_html(final_content),
                     parse_mode="HTML",
                 )
             elif media_type == "document":
                 await context.bot.send_document(
                     chat_id=uid,
                     document=file_id,
-                    caption=final_content,
+                    caption=ai_tutor.escape_html(final_content),
                     parse_mode="HTML",
                 )
             elif media_type == "video":
                 await context.bot.send_video(
                     chat_id=uid,
                     video=file_id,
-                    caption=final_content,
+                    caption=ai_tutor.escape_html(final_content),
                     parse_mode="HTML",
                 )
             elif media_type == "audio":
                 await context.bot.send_audio(
                     chat_id=uid,
                     audio=file_id,
-                    caption=final_content,
+                    caption=ai_tutor.escape_html(final_content),
                     parse_mode="HTML",
                 )
             elif media_type == "voice":
                 await context.bot.send_voice(
                     chat_id=uid,
                     voice=file_id,
-                    caption=final_content,
+                    caption=ai_tutor.escape_html(final_content),
                     parse_mode="HTML",
                 )
             else:
                 # Text only
                 await context.bot.send_message(
-                    chat_id=uid, text=final_content, parse_mode="HTML"
+                    chat_id=uid,
+                    text=ai_tutor.escape_html(final_content),
+                    parse_mode="HTML",
                 )
 
             count += 1
