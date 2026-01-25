@@ -27,7 +27,27 @@ Hi! This is how you use me:
 
 That's all! Simple right? 😁
 These are some alternative commands I can do:
-/pasummatch - This was made due to the incessant request of Arman Roommate Anthonny
+
+<b>📰 News & Submissions:</b>
+/news - View latest PASUM news and updates with pagination
+/post - Submit a post with optional image/PDF for Mimi to moderate and categorize
+/post reply [ID] [text] - Reply to a specific news post by its ID
+
+<b>🤝 Community:</b>
+/pasummatch - Find and connect with other PASUM students
+
+<b>📚 Academic Resources:</b>
+/tutorials - Access tutorial answers
+/lecturenotes - Get lecture notes and resources
+/jottednotes - Access jotted study notes
+
+<b>👤 Profile:</b>
+/profile - View or update your profile
+/random - Discover a random PASUM student's profile
+
+<b>⚙️ Bot Management:</b>
+/reset - Clear your conversation context (soft reset)
+/hardreset - Complete reset of all your data
 """
 
 TUTORIAL_ANSWERS = """
@@ -70,12 +90,6 @@ https://mecea.mpm.edu.my/MUETD/index.php
 
 Message @AnthonNYN if anything is missing!
 """
-
-
-
-
-
-
 
 
 MID_SEM = """

@@ -7,6 +7,7 @@ from telegram.ext import (
     ContextTypes,
     ConversationHandler,
     PicklePersistence,
+    CallbackQueryHandler,
 )
 from dotenv import load_dotenv
 from utils import (
@@ -25,6 +26,8 @@ from utils import (
     announcer,
     admin_manager,
     sync_cmd,
+    news_browser,
+    submissions,
 )
 import os
 
@@ -38,7 +41,15 @@ if not API_KEY:
     raise ValueError("API_KEY not found in environment variables")
 
 persistence = PicklePersistence(filepath="bot_persistence.pickle")
-app = Application.builder().token(API_KEY).persistence(persistence).read_timeout(100).write_timeout(100).connect_timeout(60).build()
+app = (
+    Application.builder()
+    .token(API_KEY)
+    .persistence(persistence)
+    .read_timeout(100)
+    .write_timeout(100)
+    .connect_timeout(60)
+    .build()
+)
 
 # --- AI Tutoring Handlers ---
 app.add_handler(
@@ -62,6 +73,10 @@ app.add_handler(CommandHandler("announce", announcer.announce))
 app.add_handler(CommandHandler("addadmin", admin_manager.add_admin))
 app.add_handler(CommandHandler("removeadmin", admin_manager.remove_admin))
 app.add_handler(CommandHandler("sync", sync_cmd.sync))
+app.add_handler(CommandHandler("news", news_browser.news_command))
+app.add_handler(CallbackQueryHandler(news_browser.news_callback, pattern="^news_"))
+app.add_handler(CallbackQueryHandler(news_browser.news_callback, pattern="^reply_"))
+app.add_handler(submissions.conv_handler)
 
 # --- Matching & Admin Handlers ---
 app.add_handler(
