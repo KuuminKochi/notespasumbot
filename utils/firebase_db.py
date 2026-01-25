@@ -292,3 +292,65 @@ def update_user_favourability(telegram_id, delta):
             {"favourability": new_val}, merge=True
         )
         print(f"DEBUG: Updated Favourability for {telegram_id}: {current} -> {new_val}")
+
+
+def get_latest_news(limit=5, last_timestamp=None):
+    """Retrieves paginated news from aggregated_posts."""
+    if not db:
+        return []
+
+    query = (
+        db.collection("aggregated_posts")
+        .where("status", "in", ["trusted", "confession", "complaint"])
+        .order_by("timestamp", direction=firestore.Query.DESCENDING)
+        .limit(limit)
+    )
+
+    if last_timestamp:
+        query = query.start_after({"timestamp": last_timestamp})
+
+    return list(query.stream())
+
+
+def save_aggregated_post(data):
+    """Saves or updates a post in the aggregated_posts collection."""
+    if not db:
+        return None
+    doc_id = data.get("doc_id")
+    if doc_id:
+        doc_ref = db.collection("aggregated_posts").document(doc_id)
+    else:
+        doc_ref = db.collection("aggregated_posts").document()
+        if "timestamp" not in data:
+            data["timestamp"] = datetime.datetime.now().isoformat()
+
+    doc_ref.set(data, merge=True)
+    return doc_ref.id
+
+
+def get_post_by_id(post_id):
+    """Finds a post by its sequential short ID (e.g. 101)."""
+    if not db:
+        return None
+    # Ensure post_id is treated correctly as int or str based on storage
+    docs = (
+        db.collection("aggregated_posts").where("post_id", "==", post_id).limit(1).get()
+    )
+    return docs[0] if docs else None
+
+
+def get_next_post_id():
+    """Generates the next sequential ID for posts."""
+    if not db:
+        return 0
+    counter_ref = db.collection("settings").document("counters")
+
+    @firestore.transactional
+    def update_counter(transaction, ref):
+        snapshot = ref.get(transaction=transaction)
+        current = snapshot.get("post_id") if snapshot.exists else 100
+        new_val = current + 1
+        transaction.set(ref, {"post_id": new_val}, merge=True)
+        return new_val
+
+    return update_counter(db.transaction(), counter_ref)

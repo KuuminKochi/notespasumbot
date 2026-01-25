@@ -1,17 +1,17 @@
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from dotenv import load_dotenv
-from utils import globals
+from telegram.ext import ContextTypes
+from utils import globals as bot_globals
 import os
 
-load_dotenv()
+NOTES_PASUM = int(os.getenv("NOTES_PASUM", "0"))
+ADMIN_NOTES = int(os.getenv("ADMIN_NOTES", "0"))
 
-API_KEY = os.getenv("API_KEY")
-NOTES_PASUM = int(os.getenv("NOTES_PASUM"))
-ADMIN_NOTES = int(os.getenv("ADMIN_NOTES"))
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.id == NOTES_PASUM:
-        await update.message.reply_text(globals.WARNING)
+    if not update.message or not update.effective_chat:
         return
-    await update.message.reply_text(globals.INTRODUCTION)
+
+    if update.effective_chat.id == NOTES_PASUM:
+        await update.message.reply_text(bot_globals.WARNING)
+        return
+    await update.message.reply_text(bot_globals.INTRODUCTION)
