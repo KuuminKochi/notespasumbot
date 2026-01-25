@@ -156,10 +156,21 @@ async def process_submission(update: Update, context: ContextTypes.DEFAULT_TYPE)
             os.remove(photo_path)
         return ConversationHandler.END
 
-    # 2. Assign IDs
+    # 2. Assign IDs and Validate Configuration
     post_id = firebase_db.get_next_post_id()
     dest_id = os.getenv("DESTINATION_GROUP_ID")
     bot_token = os.getenv("API_KEY")
+
+    # Validate destination group is configured
+    if not dest_id:
+        await query.message.reply_text(
+            "❌ <b>Configuration Error:</b>\n"
+            "Destination group not configured. Please contact admin.",
+            parse_mode="HTML",
+        )
+        if photo_path and os.path.exists(photo_path):
+            os.remove(photo_path)
+        return ConversationHandler.END
 
     # 3. Format Message
     emoji_map = {"news": "✨", "complaint": "⚠️", "confession": "🤫"}
@@ -176,6 +187,8 @@ async def process_submission(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     # 4. Forward to Group
     dest_msg_id = None
+    send_success = False
+    error_message = None
     try:
         async with httpx.AsyncClient() as client:
             if photo_path and photo_path.lower().endswith((".jpg", ".png", ".jpeg")):
@@ -194,30 +207,46 @@ async def process_submission(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
             if response.status_code == 200:
                 dest_msg_id = response.json()["result"]["message_id"]
+                send_success = True
+            else:
+                error_message = response.text
+                logger.error(
+                    f"Telegram API error: {response.status_code} - {response.text}"
+                )
     except Exception as e:
-        logger.error(f"Error forwarding user post: {e}")
+        error_message = str(e)
+        logger.error(f"Error forwarding user post: {e}", exc_info=True)
 
-    # 5. Save to Firestore
-    post_data = {
-        "post_id": post_id,
-        "content_text": analysis["cleaned_text"],
-        "original_content": text,
-        "summary": analysis["summary"],
-        "tags": analysis["tags"],
-        "status": analysis["type"],
-        "source_group": "User Submission",
-        "source_id": user.id,
-        "author_name": author_name,
-        "dest_msg_id": dest_msg_id,
-        "source_type": "user_submission",
-        "timestamp": datetime.datetime.now().isoformat(),
-    }
-    firebase_db.save_aggregated_post(post_data)
+    # 5. Save to Firestore and respond to user
+    if send_success:
+        post_data = {
+            "post_id": post_id,
+            "content_text": analysis["cleaned_text"],
+            "original_content": text,
+            "summary": analysis["summary"],
+            "tags": analysis["tags"],
+            "status": analysis["type"],
+            "source_group": "User Submission",
+            "source_id": user.id,
+            "author_name": author_name,
+            "dest_msg_id": dest_msg_id,
+            "source_type": "user_submission",
+            "timestamp": datetime.datetime.now().isoformat(),
+        }
+        firebase_db.save_aggregated_post(post_data)
 
-    await query.message.reply_text(
-        f"✅ <b>Post Successful!</b>\nYour post is live as <b>#{post_id}</b>.",
-        parse_mode="HTML",
-    )
+        await query.message.reply_text(
+            f"✅ <b>Post Successful!</b>\nYour post is live as <b>#{post_id}</b>.",
+            parse_mode="HTML",
+        )
+    else:
+        await query.message.reply_text(
+            f"❌ <b>Failed to post</b>\n\n"
+            f"<i>Error: {error_message or 'Unknown error'}</i>\n\n"
+            f"Please try again or contact admin if the issue persists.",
+            parse_mode="HTML",
+        )
+
     if photo_path and os.path.exists(photo_path):
         os.remove(photo_path)
     return ConversationHandler.END
