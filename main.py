@@ -51,13 +51,6 @@ app = (
     .build()
 )
 
-# --- AI Tutoring Handlers ---
-app.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, pipequestions.pipe_question)
-)
-app.add_handler(MessageHandler(filters.PHOTO, pipequestions.pipe_question))
-app.add_handler(MessageHandler(filters.Document.PDF, pipequestions.pipe_question))
-
 # --- Command Handlers ---
 app.add_handler(CommandHandler("start", start.start))
 app.add_handler(CommandHandler("help", help.help_message))
@@ -76,7 +69,17 @@ app.add_handler(CommandHandler("sync", sync_cmd.sync))
 app.add_handler(CommandHandler("news", news_browser.news_command))
 app.add_handler(CallbackQueryHandler(news_browser.news_callback, pattern="^news_"))
 app.add_handler(CallbackQueryHandler(news_browser.news_callback, pattern="^reply_"))
+
+# --- Conversation Handlers (must be before general MessageHandlers) ---
 app.add_handler(submissions.conv_handler)
+app.add_handler(pasumpals.conv)
+
+# --- AI Tutoring Handlers (must be last to allow conversations to work) ---
+app.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, pipequestions.pipe_question)
+)
+app.add_handler(MessageHandler(filters.PHOTO, pipequestions.pipe_question))
+app.add_handler(MessageHandler(filters.Document.PDF, pipequestions.pipe_question))
 
 # --- Matching & Admin Handlers ---
 app.add_handler(
@@ -92,7 +95,6 @@ app.add_handler(
 )
 
 # Profile Management
-app.add_handler(pasumpals.conv)
 app.add_handler(CommandHandler("profile", pasumpals.profile))
 app.add_handler(CommandHandler("random", pasumpals.random_profile))
 
