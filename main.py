@@ -25,6 +25,7 @@ from utils import (
     news_browser,
     submissions,
     status,
+    ai_moderator,
 )
 from utils.aggregator_service.aggregator import Aggregator
 from utils.aggregator_service.cleaner import cleanup_task
@@ -57,7 +58,12 @@ async def start_aggregator_task(application: Application):
 
         # 2. Initialize Aggregator
         aggregator = Aggregator(
-            "mimi_aggregator", int(TELEGRAM_API_ID), TELEGRAM_API_HASH
+            "mimi_aggregator",
+            int(TELEGRAM_API_ID),
+            TELEGRAM_API_HASH,
+            API_KEY,
+            os.getenv("DESTINATION_GROUP_ID") or "",
+            int(os.getenv("CONFESSIONS_GROUP_ID", "0")),
         )
         # Start as background task
         asyncio.create_task(aggregator.start())
