@@ -11,62 +11,131 @@ from telegram.ext import (
 )
 from dotenv import load_dotenv
 from utils import (
-    lecturenotes,
     pipequestions,
     pipeanswers,
-    start,
+    resource_handler,
     getid,
     pasummatch,
     help,
-    tutorialanswers,
-    mid_sem,
-    pasumpals,
-    jottednotes,
     commands,
+    pasumpals,
     announcer,
     admin_manager,
     sync_cmd,
     news_browser,
     submissions,
+    status,
 )
+from utils.aggregator_service.aggregator import Aggregator
+from utils.aggregator_service.cleaner import cleanup_task
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import os
+import asyncio
 
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
+TELEGRAM_API_ID = os.getenv("TELEGRAM_API_ID")
+TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH")
 NOTES_PASUM = int(os.getenv("NOTES_PASUM", 0))
 ADMIN_NOTES = int(os.getenv("ADMIN_NOTES", 0))
 
 if not API_KEY:
     raise ValueError("API_KEY not found in environment variables")
 
+
+async def start_aggregator_task(application: Application):
+    """Starts the Mimi Aggregator service in the background."""
+    if TELEGRAM_API_ID and TELEGRAM_API_HASH:
+        print("🚀 Starting Mimi Aggregator Service...")
+
+        # 1. Start Cleaner Scheduler
+        scheduler = AsyncIOScheduler()
+        scheduler.add_job(cleanup_task, "interval", days=1)
+        scheduler.start()
+        print("🧹 Cleaner Scheduler Started.")
+
+        # 2. Initialize Aggregator
+        aggregator = Aggregator(
+            "mimi_aggregator", int(TELEGRAM_API_ID), TELEGRAM_API_HASH
+        )
+        # Start as background task
+        asyncio.create_task(aggregator.start())
+    else:
+        print("⚠️ Aggregator skipped: Missing TELEGRAM_API_ID/HASH")
+
+
 persistence = PicklePersistence(filepath="bot_persistence.pickle")
 app = (
     Application.builder()
     .token(API_KEY)
     .persistence(persistence)
+    .post_init(start_aggregator_task)
     .read_timeout(100)
     .write_timeout(100)
     .connect_timeout(60)
     .build()
 )
 
+
+async def debug_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Log every message the bot sees for debugging."""
+    if update.effective_message:
+        logger.info(
+            f"🔍 DEBUG BOT SAW MSG: '{update.effective_message.text}' from {update.effective_user.id if update.effective_user else 'None'} in {update.effective_chat.id if update.effective_chat else 'None'}"
+        )
+    elif update.callback_query:
+        logger.info(f"🔍 DEBUG BOT SAW CALLBACK: {update.callback_query.data}")
+    else:
+        logger.info(
+            f"🔍 DEBUG BOT SAW UPDATE: {update.to_dict() if hasattr(update, 'to_dict') else update}"
+        )
+
+
 # --- Command Handlers ---
-app.add_handler(CommandHandler("start", start.start))
+app.add_handler(
+    MessageHandler(filters.ALL, debug_message_handler), group=-1
+)  # Run before others
+app.add_handler(
+    CommandHandler(
+        "start", lambda u, c: resource_handler.send_resource(u, c, "INTRODUCTION")
+    )
+)
 app.add_handler(CommandHandler("help", help.help_message))
 app.add_handler(CommandHandler("getId", getid.get_id))
-app.add_handler(CommandHandler("tutorials", tutorialanswers.tutorial_answers))
-app.add_handler(CommandHandler("lecturenotes", lecturenotes.lecture_notes))
-app.add_handler(CommandHandler("jottednotes", jottednotes.jotted_notes))
+app.add_handler(
+    CommandHandler(
+        "tutorials",
+        lambda u, c: resource_handler.send_resource(u, c, "TUTORIAL_ANSWERS"),
+    )
+)
+app.add_handler(
+    CommandHandler(
+        "lecturenotes",
+        lambda u, c: resource_handler.send_resource(u, c, "LECTURE_NOTES"),
+    )
+)
+app.add_handler(
+    CommandHandler(
+        "jottednotes", lambda u, c: resource_handler.send_resource(u, c, "JOTTED_NOTES")
+    )
+)
 
 # New AI Management Commands
 app.add_handler(CommandHandler("hardreset", commands.hard_reset))
 app.add_handler(CommandHandler("reset", commands.soft_reset))
+app.add_handler(
+    CommandHandler(
+        "midsem", lambda u, c: resource_handler.send_resource(u, c, "MID_SEM")
+    )
+)
 app.add_handler(CommandHandler("announce", announcer.announce))
 app.add_handler(CommandHandler("addadmin", admin_manager.add_admin))
 app.add_handler(CommandHandler("removeadmin", admin_manager.remove_admin))
 app.add_handler(CommandHandler("sync", sync_cmd.sync))
 app.add_handler(CommandHandler("news", news_browser.news_command))
+app.add_handler(CommandHandler("reply", submissions.reply_command_handler))
+app.add_handler(CommandHandler("status", status.status_command))
 app.add_handler(CallbackQueryHandler(news_browser.news_callback, pattern="^news_"))
 app.add_handler(CallbackQueryHandler(news_browser.news_callback, pattern="^reply_"))
 
@@ -145,17 +214,11 @@ if __name__ == "__main__":
     # Add error handler
     app.add_error_handler(error_handler)
 
-    while True:
-        try:
-            print("🚀 Starting polling loop...")
-            app.run_polling(
-                allowed_updates=Update.ALL_TYPES, drop_pending_updates=False
-            )
-        except Exception as e:
-            print(f"❌ CRITICAL ERROR: {e}")
-            logger.critical(f"Bot crashed with error: {e}", exc_info=True)
-            print("🔄 Restarting in 5 seconds...")
-            time.sleep(5)
-        except KeyboardInterrupt:
-            print("🛑 Bot stopped by user.")
-            break
+    try:
+        print("🚀 Starting polling loop...")
+        app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=False)
+    except Exception as e:
+        print(f"❌ ERROR: {e}")
+        logger.critical(f"Bot exited with error: {e}", exc_info=True)
+    except KeyboardInterrupt:
+        print("🛑 Bot stopped by user.")

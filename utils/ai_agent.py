@@ -357,36 +357,6 @@ def get_debate_instructions(telegram_id):
 
     return instructions
 
-    # ... (rest of file)
-
-    # Value Interpretation
-    val = state["value"]
-    style = state["style"]
-
-    if val <= 30:
-        intensity = "CONCILIATORY: You are unsure. Concede quickly if challenged. Agree with the user."
-    elif val <= 70:
-        intensity = "BALANCED: You are confident but open. Challenge illogical points but accept good ones."
-    else:
-        intensity = "AGGRESSIVE: You are stubborn. Double down on your points. Nitpick the user's logic."
-
-    instructions += f"INTENSITY ({val}/100): {intensity}\n"
-    instructions += f"STYLE: {style}\n"
-
-    if style == "Socratic":
-        instructions += "STRATEGY: Ask leading questions. Don't give answers directly. Expose the user's ignorance through their own words.\n"
-    elif style == "Contrarian":
-        instructions += "STRATEGY: Play devil's advocate. Even if the user is right, find a flaw or an edge case.\n"
-    elif style == "Specialist":
-        instructions += "STRATEGY: PIVOT the argument back to Engineering, Physics, or PASUM life. Relate everything to these topics.\n"
-
-    instructions += "LOGIC: Call out logical fallacies (Strawman, Ad Hominem, Circular Reasoning) if you see them.\n"
-
-    if state["persona"] == "Glitch":
-        instructions += "PERSONA GLITCH: You are slightly malfunctioning. Speak in a robotic or hyper-erratic way. Use snippets of code or error logs in your speech.\n"
-
-    return instructions
-
 
 async def execute_tool(name, args, user_id=None):
     # Wrap synchronous tool calls in asyncio.to_thread
